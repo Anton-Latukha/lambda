@@ -1,0 +1,131 @@
+cabal-version:  3.4
+name:           lambda
+version:        0.1.0.0
+synopsis:       Lambda calculus project for recreation
+category:       Programming language
+homepage:       https://github.com/Anton-Latukha/lambda#readme
+bug-reports:    https://github.com/Anton-Latukha/lambda/issues
+author:         Anton-Latukha
+maintainer:     anton.latukha+lambda@gmail.com
+license:        LGPL-2.1-or-later
+license-file:   License
+build-type:     Simple
+data-dir:       data/
+extra-source-files:
+  ChangeLog.md
+  -- ReadMe.md
+  License
+
+source-repository head
+  type: git
+  location: https://github.com/Anton-Latukha/lambda
+
+flag optimize
+  description: Enable all optimization flags
+  manual: True
+  default: True
+
+flag profiling
+  description: Enable profiling
+  manual: True
+  default: False
+
+common shared
+  default-language: GHC2021     -- 2025-05-01: NOTE: Update to GHC2024.
+  default-extensions:
+      NoImplicitPrelude
+    , LambdaCase
+    , ViewPatterns
+    , OverloadedStrings
+    , OverloadedLists
+  build-depends:
+      base
+    -- , data-fix
+    -- , exceptions
+    -- , filepath
+    -- , relude
+    -- , serialise
+    -- , template-haskell
+    -- , time
+    -- , tasty
+    -- , tasty-hunit
+    -- , geniplate-mirror
+    -- , validity
+    -- , genvalidity
+    -- , QuickCheck
+    -- , Cabal-syntax
+    -- , genvalidity-hspec
+    -- , yaya
+  ghc-options:
+    -Wall
+    -Wno-incomplete-uni-patterns
+    -fprint-potential-instances
+    -- -ddump-deriv
+  if flag(optimize)
+    default-extensions:
+      ApplicativeDo
+    ghc-options:
+      -O2
+      -fexpose-all-unfoldings
+      -fspecialise-aggressively
+  -- if !flag(profiling)
+  --   build-depends:
+  --       ghc-datasize
+
+library
+  import: shared
+  exposed-modules:
+    Hisp.Prelude
+    Hisp.Utils
+  other-modules:
+    Paths_lambda
+  autogen-modules:
+    Paths_lambda
+  hs-source-dirs:
+    lib
+  build-depends:
+
+executable hisp
+  import: shared
+  hs-source-dirs:
+    app
+  main-is: Main.hs
+--   other-modules:
+--     Repl
+--     Paths_hnix
+--   autogen-modules:
+--     Paths_hnix
+  build-depends:
+       lambda
+--     , pretty-show
+--     , prettyprinter
+--   if impl(ghc < 8.10)
+--     -- GHC < 8.10 comes with haskeline < 0.8, which we don't support.
+--     -- To simplify CI, we just disable the component.
+--     buildable: False
+
+test-suite hnix-tests
+  import: shared
+  type: exitcode-stdio-1.0
+  main-is: Tests.hs
+--   other-modules:
+  hs-source-dirs:
+    Tests
+  build-depends:
+      lambda
+    , tasty
+    , tasty-hunit
+    , tasty-hedgehog
+    , tasty-quickcheck
+
+-- benchmark hnix-benchmarks
+--   import: shared
+--   type: exitcode-stdio-1.0
+--   main-is: Main.hs
+--   other-modules:
+--     ParserBench
+--   hs-source-dirs:
+--     benchmarks
+--   build-depends:
+--     lambda
+--     , criterion
