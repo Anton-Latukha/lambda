@@ -88,6 +88,7 @@ library
   exposed-modules:
     Lambda.Utils
     Lambda.Prelude
+    Lambda.Lambda
 
   other-modules:
     Paths_lambda
@@ -96,11 +97,14 @@ library
   hs-source-dirs:
     lib
   build-depends:
+    -- 2025-05-02: NOTE: imports for "Lambda.Lambda"
+    , yaya
+    , attoparsec
 
 -- executable lambda
 --   import: shared
 --   hs-source-dirs:
---     exe
+--     exec
 --   main-is: Main.hs
 --   other-modules:
 --     Repl
@@ -122,7 +126,7 @@ test-suite hnix-tests
   main-is: Tests.hs
 --   other-modules:
   hs-source-dirs:
-    tst
+    test
   build-depends:
       lambda
     , tasty
