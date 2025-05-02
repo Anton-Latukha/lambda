@@ -44,8 +44,18 @@ common shared
     -- , data-fix
     -- , exceptions
     -- , filepath
-    -- , relude
-    -- , serialise
+    , relude
+
+    --  2025-05-02: NOTE: Imports for module "Utils":
+    , binary
+    , serialise
+    , free
+    , monad-control
+    , aeson
+    , data-fix
+    , lens-family
+    , filepath
+
     -- , template-haskell
     -- , time
     -- , tasty
@@ -76,8 +86,9 @@ common shared
 library
   import: shared
   exposed-modules:
-    Lambda.Prelude
     Lambda.Utils
+    Lambda.Prelude
+
   other-modules:
     Paths_lambda
   autogen-modules:
@@ -86,18 +97,18 @@ library
     lib
   build-depends:
 
-executable lambda
-  import: shared
-  hs-source-dirs:
-    app
-  main-is: Main.hs
+-- executable lambda
+--   import: shared
+--   hs-source-dirs:
+--     exe
+--   main-is: Main.hs
 --   other-modules:
 --     Repl
 --     Paths_hnix
 --   autogen-modules:
 --     Paths_hnix
-  build-depends:
-       lambda
+-- build-depends:
+--      lambda
 --     , pretty-show
 --     , prettyprinter
 --   if impl(ghc < 8.10)
@@ -111,7 +122,7 @@ test-suite hnix-tests
   main-is: Tests.hs
 --   other-modules:
   hs-source-dirs:
-    test
+    tst
   build-depends:
       lambda
     , tasty
