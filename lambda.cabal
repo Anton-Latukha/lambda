@@ -31,7 +31,8 @@ flag profiling
   default: False
 
 common shared
-  default-language: GHC2021     -- 2025-05-01: NOTE: Update to GHC2024.
+  -- 2025-05-01: NOTE: Update to GHC2024.
+  default-language: GHC2021
   default-extensions:
       NoImplicitPrelude
     , LambdaCase
@@ -75,8 +76,8 @@ common shared
 library
   import: shared
   exposed-modules:
-    Hisp.Prelude
-    Hisp.Utils
+    Lambda.Prelude
+    Lambda.Utils
   other-modules:
     Paths_lambda
   autogen-modules:
@@ -85,7 +86,7 @@ library
     lib
   build-depends:
 
-executable hisp
+executable lambda
   import: shared
   hs-source-dirs:
     app
@@ -110,7 +111,7 @@ test-suite hnix-tests
   main-is: Tests.hs
 --   other-modules:
   hs-source-dirs:
-    Tests
+    test
   build-depends:
       lambda
     , tasty
