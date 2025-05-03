@@ -4,6 +4,8 @@ module Lambda.Lambda
   (
   ) where
 
+-- ** Import
+
 import Lambda.Prelude hiding (LT)
 import Relude.Extra.Enum (prev, next)
 import qualified Text.Show
