@@ -1,4 +1,5 @@
 {-# language PatternSynonyms #-}
+{-# language PartialTypeSignatures #-}
 
 module Lambda.Lambda
   (
@@ -6,7 +7,7 @@ module Lambda.Lambda
 
 -- ** Import
 
-import Lambda.Prelude hiding (LT)
+import Lambda.Prelude
 import Relude.Extra.Enum (prev, next)
 import qualified Text.Show
 import Data.Attoparsec.Text
@@ -18,178 +19,203 @@ import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..)
 
 -- *** Initial type primitive boundaries
 
+-- **** New type typisation
+
 -- | Bruijn index in lambda term.
 -- Index < number of external lambda binds => index == binded lambda value
 -- Index >= number of external lambda binds => index == free variable
-newtype BJIndx = BJIndx Int
+newtype BruijnIndex = BruijnIndex Int
  deriving (Eq, Enum, Num, Bounded, Show, Generic)
 
-newtype LTFAppFunc a = LTFAppFunc (LTF a)
+newtype LambdaTermFAppFunc a = LambdaTermFAppFunc (LambdaTermF a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
-newtype LTFAppParam a = LTFAppParam (LTF a)
+newtype LambdaTermFAppParam a = LambdaTermFAppParam (LambdaTermF a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
-newtype LTFLamBody a = LTFLamBody (LTF a)
+newtype LambdaTermFLamBody a = LambdaTermFLamBody (LambdaTermF a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
-data LTF a
-  = LTFBJIndx !BJIndx
-  | LTFApp    !(LTFAppFunc a) !(LTFAppParam a)
-  | LTFLam    !(LTFLamBody a)
+-- **** Functorial Lambda term/expression
+
+data LambdaTermF a
+  = LambdaTermFBruijnIndex !BruijnIndex
+  | LambdaTermFApp    !(LambdaTermFAppFunc a) !(LambdaTermFAppParam a)
+  | LambdaTermFLam    !(LambdaTermFLamBody a)
  deriving (Eq, Show, Generic, Functor, Traversable, Foldable)
 
-instance Recursive (->) LT LTF where
-  cata :: Algebra (->) LTF a -> LT -> a
-  cata φ (LT (Mu f)) = f φ
+-- ***** Instances
 
-instance Projectable (->) LT LTF where
-  project :: Coalgebra (->) LTF LT
+instance Recursive (->) LambdaTerm LambdaTermF where
+  cata :: Algebra (->) LambdaTermF a -> LambdaTerm -> a
+  cata φ (LambdaTerm (Mu f)) = f φ
+
+instance Projectable (->) LambdaTerm LambdaTermF where
+  project :: Coalgebra (->) LambdaTermF LambdaTerm
   project = lambek
 
-instance Steppable (->) LT LTF where
-  embed :: Algebra (->) LTF LT
-  embed m = LT $ Mu $ \ f -> f $ fmap (cata f) m
+instance Steppable (->) LambdaTerm LambdaTermF where
+  embed :: Algebra (->) LambdaTermF LambdaTerm
+  embed m = LambdaTerm $ Mu $ \ f -> f $ fmap (cata f) m
 
-instance Eq1 LTF where
-  liftEq :: (a -> b -> Bool) -> LTF a -> LTF b -> Bool
+instance Eq1 LambdaTermF where
+  liftEq :: (a -> b -> Bool) -> LambdaTermF a -> LambdaTermF b -> Bool
   liftEq = go  -- Making shure GHC detects that there is no point to go through typeclass dictionary searches, all other instances derive from here.
    where
-    go eq (LTFLam    b1   ) (LTFLam    b2   ) = crc go eq b1 b2
-    go eq (LTFApp    f1 p1) (LTFApp    f2 p2) = crc go eq f1 f2 && crc go eq p1 p2
-    go _  (LTFBJIndx idx1 ) (LTFBJIndx idx2 ) = idx1 == idx2
+    go eq (LambdaTermFLam    b1   ) (LambdaTermFLam    b2   ) = crc go eq b1 b2
+    go eq (LambdaTermFApp    f1 p1) (LambdaTermFApp    f2 p2) = crc go eq f1 f2 && crc go eq p1 p2
+    go _  (LambdaTermFBruijnIndex idx1 ) (LambdaTermFBruijnIndex idx2 ) = idx1 == idx2
     go _ _ _ = False
 
-newtype LT = LT (Mu LTF)
+-- **** Finished LambdaTerm
+
+newtype LambdaTerm = LambdaTerm (Mu LambdaTermF)
  deriving (Eq, Generic)
 
 -- *** Isomorphism of lambda term to human readable representation
 
 -- | Abstraction for representation of human readable view of the main lambda term datatype
-newtype LTBJHumanReadable = LTBJHumanReadable LT
-instance Show LTBJHumanReadable where
-  show :: LTBJHumanReadable -> String
+newtype LambdaTermBJHumanReadable = LambdaTermBJHumanReadable LambdaTerm
+
+-- **** Instances
+
+instance Show LambdaTermBJHumanReadable where
+  show :: LambdaTermBJHumanReadable -> String
   show = l_showHR . crc
    where
     -- | There is a newtype boundary between main lambda term data type and human readable, code prefers to preserve the general GHC derived @Show@ instances for the general case (showing term/expression internals) for the lambda term and its components, which is why this coersion enforsment is needed.
-    l_showHR :: LT -> String
+    l_showHR :: LambdaTerm -> String
     l_showHR =
-      caseLT
+      caseLambdaTerm
         show
         showApp
         showLam
      where
-      showApp :: LT -> LT -> String
+      showApp :: LambdaTerm -> LambdaTerm -> String
       showApp f a = "(" <> l_showHR f <> ") " <> l_showHR a
-      showLam :: LT -> String
+      showLam :: LambdaTerm -> String
       showLam b = "\\ " <> l_showHR b
 
-turnReadable :: LT -> Text
-turnReadable = show . LTBJHumanReadable
+instance Show LambdaTerm where
+  show (crc @LambdaTermBJHumanReadable -> a) = show a
 
-instance Show LT where
-  show (crc @LTBJHumanReadable -> a) = show a
+-- **** Functions
+
+turnReadable :: LambdaTerm -> Text
+turnReadable = show . LambdaTermBJHumanReadable
 
 -- *** Patterns
 
-pattern PatLTBJIndx :: Int -> LT
-pattern PatLTBJIndx n <- (project -> LTFBJIndx (BJIndx n)) where
-        PatLTBJIndx n =     embed (  LTFBJIndx (BJIndx n))
+pattern PatLambdaTermBruijnIndex :: Int -> LambdaTerm
+pattern PatLambdaTermBruijnIndex n <- (project -> LambdaTermFBruijnIndex (BruijnIndex n)) where
+        PatLambdaTermBruijnIndex n =     embed (  LambdaTermFBruijnIndex (BruijnIndex n))
 
-pattern PatLTApp :: LT -> LT -> LT
-pattern PatLTApp f a <- (project -> LTFApp (LTFAppFunc (embed -> f)) (LTFAppParam (embed -> a))) where
-        PatLTApp f a =     embed (  LTFApp (LTFAppFunc (project  f)) (LTFAppParam (project  a)))
+pattern PatLambdaTermApp :: LambdaTerm -> LambdaTerm -> LambdaTerm
+pattern PatLambdaTermApp f a <- (project -> LambdaTermFApp (LambdaTermFAppFunc (embed -> f)) (LambdaTermFAppParam (embed -> a))) where
+        PatLambdaTermApp f a =     embed (  LambdaTermFApp (LambdaTermFAppFunc (project  f)) (LambdaTermFAppParam (project  a)))
 
-pattern PatLTLam :: LT -> LT
-pattern PatLTLam b <- (project -> LTFLam (LTFLamBody (embed -> b))) where
-        PatLTLam b =     embed (  LTFLam (LTFLamBody (project  b)))
+pattern PatLambdaTermLam :: LambdaTerm -> LambdaTerm
+pattern PatLambdaTermLam b <- (project -> LambdaTermFLam (LambdaTermFLamBody (embed -> b))) where
+        PatLambdaTermLam b =     embed (  LambdaTermFLam (LambdaTermFLamBody (project  b)))
 
-{-# complete PatLTBJIndx, PatLTApp, PatLTLam #-}
+{-# complete PatLambdaTermBruijnIndex, PatLambdaTermApp, PatLambdaTermLam #-}
 
 -- *** Builders
 
-mkLTBJIndx :: Int -> LT
-mkLTBJIndx = PatLTBJIndx
+mkLambdaTermBruijnIndex :: Int -> LambdaTerm
+mkLambdaTermBruijnIndex = PatLambdaTermBruijnIndex
 
-mkLTApp :: LT -> LT -> LT
-mkLTApp = PatLTApp
+mkLambdaTermApp :: LambdaTerm -> LambdaTerm -> LambdaTerm
+mkLambdaTermApp = PatLambdaTermApp
 
-mkLTLam :: LT -> LT
-mkLTLam = PatLTLam
+mkLambdaTermLam :: LambdaTerm -> LambdaTerm
+mkLambdaTermLam = PatLambdaTermLam
 
 -- *** Helpers
 
--- | Takes a set of for lambda term cases and applies according function:
-caseLT
+-- | Takes a set of for lambda term cases, takes a lambda term, detects term and applies according function to it:
+caseLambdaTerm
   :: (Int -> a)     -- ^ For index
-  -> (LT -> LT -> a) -- ^ For application
-  -> (LT -> a)      -- ^ For function
-  -> LT            -- ^ Term
-  -> a             -- ^ Result of the accordingly applied function
-caseLT cf ca cl =
+  -> (LambdaTerm -> LambdaTerm -> a) -- ^ For application
+  -> (LambdaTerm -> a)      -- ^ For function
+  -> LambdaTerm            -- ^ Term
+  -> a             -- ^ Result
+caseLambdaTerm cf ca cl =
  \case
-  PatLTBJIndx i -> cf   i
-  PatLTApp  f a -> ca f a
-  PatLTLam    b -> cl   b
+  PatLambdaTermBruijnIndex i -> cf   i
+  PatLambdaTermApp       f a -> ca f a
+  PatLambdaTermLam         b -> cl   b
 
 -- *** Parser
 
-parserLT :: Parser LT
-parserLT =
+parserLambdaTerm :: Parser LambdaTerm
+parserLambdaTerm =
   bruijnIndexParser <|>
   lambdaParser <|>
   appParser
  where
-  bruijnIndexParser :: Parser LT
-   = mkLTBJIndx <$> decimal
-  lambdaParser :: Parser LT
-   = mkLTLam <$> (string "\\ " *> bruijnIndexParser)
-  appParser :: Parser LT
-   = mkLTApp <$> appFuncParser <*> appParamParser
+  bruijnIndexParser :: Parser LambdaTerm
+   = mkLambdaTermBruijnIndex <$> decimal
+  lambdaParser :: Parser LambdaTerm
+   = mkLambdaTermLam <$> (string "\\ " *> bruijnIndexParser)
+  appParser :: Parser LambdaTerm
+   = mkLambdaTermApp <$> appFuncParser <*> appParamParser
    where
-    appFuncParser :: Parser LT
-     = char '(' *> parserLT <* char ')'
-    appParamParser :: Parser LT
-     = char ' ' *> parserLT
+    appFuncParser :: Parser LambdaTerm
+     = char '(' *> parserLambdaTerm <* char ')'
+    appParamParser :: Parser LambdaTerm
+     = char ' ' *> parserLambdaTerm
 
 -- *** Normal form
 
 -- | Normal form lambda term.
-newtype NLT = NLT LT
+newtype NLambdaTerm = NLambdaTerm LambdaTerm
 
-normalize :: LT -> NLT
+normalize :: LambdaTerm -> NLambdaTerm
 normalize = crc .
-  caseLT
-    PatLTBJIndx
+  caseLambdaTerm
+    PatLambdaTermBruijnIndex
     forLambdaApplication
     forLambdaFunction
  where
-  forLambdaApplication :: LT -> LT -> LT
+  forLambdaApplication :: LambdaTerm -> LambdaTerm -> LambdaTerm
   forLambdaApplication =
     flip betaReduce
 
-  forLambdaFunction :: LT -> LT
+  forLambdaFunction :: LambdaTerm -> LambdaTerm
   forLambdaFunction =
-    PatLTLam . crc . normalize
+    PatLambdaTermLam . crc . normalize
 
   -- | Lambda function application.
   -- Does beta-reduce when lambda term matches definition, otherwise does id.
   -- TODO: Try for this function to return Maybe.
   betaReduce
-    :: LT -- ^ Argument to bind
-    -> LT -- ^ Expression to find bind targets
-    -> LT -- ^ Expression with the bind applied
+    :: LambdaTerm -- ^ Argument to bind
+    -> LambdaTerm -- ^ Base expression to bind in
+    -> LambdaTerm -- ^ Expression with the bind applied
   betaReduce a =
     \case
-      (PatLTLam lb) -> substitute a 0 lb -- run beta reduction operation only when it matches definition.
-      other -> PatLTApp other a
+      (PatLambdaTermLam lb) -> substitute a 0 lb -- Apply value to this level binding
+      other -> PatLambdaTermApp other a
    where
-    substitute :: LT -> BJIndx -> LT -> LT
+    substitute :: LambdaTerm -> BruijnIndex -> LambdaTerm -> LambdaTerm
     substitute v bji =
-      caseLT
-        (bool v . PatLTBJIndx <*> (crc bji /=))
-        (on PatLTApp (substitute v bji))
-        (substitute v $! next bji) -- Going inside internal lambda term - increase Bruijn Index code searches for.
+      caseLambdaTerm
+        (\ indx ->
+           bool
+             (PatLambdaTermBruijnIndex indx)  -- do `id` ("pass")
+             v  -- so substitution under index
+             $ indexMatches indx
+        )
+        --  (bool v . PatLambdaTermBruijnIndex <*> isThisThePlace)
+        (on PatLambdaTermApp (substituteWithValue bji))
+        substituteInDeeperFunction
+     where
+      indexMatches = (crc bji /=)
+      substituteWithValue = substitute v
+      -- | Outside Btuijn indexes increase +1 when enterning a scope of deeper function.
+      substituteInDeeperFunction = substituteWithValue $! next bji -- 2025-05-05: NOTE: This is considered costly to nameless encoding style. Since it increments/decrements all instances.
+
 
 -- *** Testing
 
@@ -202,21 +228,21 @@ runOutputUnitTests =
 -- | Parses only lawful Bruijin lambda terms.
 runParserUnitTests :: IO ()
 runParserUnitTests =
-  traverse_ (parseTest parserLT . (<> "\\n") . turnReadable) lambdaTermUnitTests
+  traverse_ (parseTest parserLambdaTerm . (<> "\\n") . turnReadable) lambdaTermUnitTests
 
-lambdaTermUnitTests :: Seq LT
+lambdaTermUnitTests :: Seq LambdaTerm
 lambdaTermUnitTests =
   (<>)
     (one mk0)
-    ((`mkLTApp` mk0) <$>
+    ((`mkLambdaTermApp` mk0) <$>
       [ mk0
-      , PatLTLam mk0
-      , PatLTLam mk0
+      , PatLambdaTermLam mk0
+      , PatLambdaTermLam mk0
       ]
     )
 
-mk0 :: LT
-mk0 = mkLTBJIndx 0
+mk0 :: LambdaTerm
+mk0 = mkLambdaTermBruijnIndex 0
 
-turnReadableThenParseBack :: LT -> Either String LT
-turnReadableThenParseBack = parseOnly parserLT . (<> "\\n") . turnReadable
+turnReadableThenParseBack :: LambdaTerm -> Either String LambdaTerm
+turnReadableThenParseBack = parseOnly parserLambdaTerm . (<> "\\n") . turnReadable
