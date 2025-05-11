@@ -56,6 +56,10 @@ common shared
     , lens-family
     , filepath
 
+    --  2025-05-11: NOTE: Imports for REPL executable
+    , repline
+    , process
+
     -- , template-haskell
     -- , time
     -- , tasty
@@ -89,6 +93,7 @@ library
     Lambda.Utils
     Lambda.Prelude
     Lambda.Lambda
+    -- Lambda.LNR
 
   other-modules:
     Paths_lambda
@@ -101,26 +106,26 @@ library
     , yaya
     , attoparsec
 
--- executable lambda
---   import: shared
---   hs-source-dirs:
---     exec
---   main-is: Main.hs
---   other-modules:
---     Repl
---     Paths_hnix
---   autogen-modules:
---     Paths_hnix
--- build-depends:
---      lambda
+executable lambda
 --     , pretty-show
 --     , prettyprinter
+  import: shared
+  hs-source-dirs:
+    exe
+  main-is: Main.hs
+  build-depends:
+     lambda
+  other-modules:
+--     Repl
+    Paths_lambda
+--   autogen-modules:
+--     Paths_hnix
 --   if impl(ghc < 8.10)
 --     -- GHC < 8.10 comes with haskeline < 0.8, which we don't support.
 --     -- To simplify CI, we just disable the component.
 --     buildable: False
 
-test-suite hnix-tests
+test-suite lambda-tests
   import: shared
   type: exitcode-stdio-1.0
   main-is: Tests.hs
