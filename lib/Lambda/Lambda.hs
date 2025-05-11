@@ -203,15 +203,15 @@ normalize = crc .
       caseLambdaTerm
         (\ indx ->
            bool
-             (PatLambdaTermBruijnIndex indx)  -- do `id` ("pass")
              v  -- so substitution under index
-             $ indexMatches indx
+             (PatLambdaTermBruijnIndex indx)  -- do `id` ("pass")
+             $ indexNotFound indx
         )
         --  (bool v . PatLambdaTermBruijnIndex <*> isThisThePlace)
         (on PatLambdaTermApp (substituteWithValue bji))
         substituteInDeeperFunction
      where
-      indexMatches = (crc bji /=)
+      indexNotFound = (crc bji /=)
       substituteWithValue = substitute v
       -- | Outside Btuijn indexes increase +1 when enterning a scope of deeper function.
       substituteInDeeperFunction = substituteWithValue $! next bji -- 2025-05-05: NOTE: This is considered costly to nameless encoding style. Since it increments/decrements all instances.
