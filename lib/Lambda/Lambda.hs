@@ -2,7 +2,7 @@
 {-# language PartialTypeSignatures #-}
 
 module Lambda.Lambda
-  (
+  ( main
   ) where
 
 -- ** Import
@@ -14,6 +14,8 @@ import Data.Attoparsec.Text
     ( decimal, parseTest, char, parseOnly, string, Parser )
 import Data.Functor.Classes ( Eq1(..) )
 import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..), Algebra, Coalgebra )
+import qualified System.Console.Repline as R
+import System.Process (callCommand)
 
 -- ** Lambda calculi
 
@@ -246,3 +248,59 @@ mk0 = mkLambdaTermBruijnIndex 0
 
 turnReadableThenParseBack :: LambdaTerm -> Either String LambdaTerm
 turnReadableThenParseBack = parseOnly parserLambdaTerm . (<> "\\n") . turnReadable
+-- *** REPL
+
+type Repl = R.HaskelineT IO
+
+banner :: R.MultiLine -> Repl Text
+banner =
+  bool
+    (pure "This is a basic Lambda calculus REPL") -- If SingleLine - print banner
+    stub  -- If there are more than one line in REPL - does not print banner
+    . (R.MultiLine /=)
+
+command :: R.Command Repl
+command = undefined
+
+-- Evaluation : handle each line user inputs
+cmd :: Text -> Repl ()
+cmd = print
+
+-- Tab Completion: return a completion for partial words entered
+completer :: Monad m => R.WordCompleter m
+completer n =
+  pure $
+      extend
+      toThis
+      $ isPrefixOf n
+ where
+  extend = flip filter
+  toThis = ["kirk", "spock", "mccoy"]
+
+help :: Text -> Repl ()
+help = putTextLn . ("Help: " <>)
+
+say :: Text -> Repl ()
+say arg =
+  liftIO (callCommand . toString $ "cowsay " <> arg)
+
+options :: R.Options Repl
+options =
+  [
+    ("help", help . fromString), -- ":help"
+    ("say", say . fromString) -- ":say"
+  ]
+
+-- | What to do/print on entering REPL.
+ini :: Repl ()
+ini = putStrLn "Welcome!"
+
+-- | What to do/print on Ctrl+D (aka user making exit)
+final :: Repl R.ExitDecision
+final = putStrLn "Goodbye!" $> R.Exit
+
+-- | Running the REPL
+main :: IO ()
+main = R.evalRepl (const . pure $ "λ> ") (cmd . fromString) options (pure ':') (pure "paste") (R.Word completer) ini final
+
+-- evalRepl = R.evalRepl banner command options
