@@ -277,9 +277,9 @@ completer = R.Word cmp
   cmp :: [Char] -> IO [[Char]]
   cmp n =
     pure $
-        extend
-        toThis
-        $ isPrefixOf n
+     extend
+       toThis
+       $ isPrefixOf n
   extend = flip filter
   toThis = ["kirk", "spock", "mccoy"]
 
