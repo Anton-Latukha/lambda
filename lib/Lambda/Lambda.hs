@@ -10,6 +10,7 @@ module Lambda.Lambda
 import Lambda.Prelude
 import Relude.Extra.Enum (prev, next)
 import qualified Text.Show
+import qualified Data.Text as Text
 import Data.Attoparsec.Text
     ( decimal, parseTest, char, parseOnly, string, Parser )
 import Data.Functor.Classes ( Eq1(..) )
@@ -99,6 +100,7 @@ instance Show LambdaTermBJHumanReadable where
       showLam b = "\\ " <> l_showHR b
 
 instance Show LambdaTerm where
+  show :: LambdaTerm -> String
   show (crc @LambdaTermBJHumanReadable -> a) = show a
 
 -- **** Functions
@@ -261,8 +263,11 @@ banner =
     . (R.MultiLine /=)
 
 -- Evaluation : handle each line user inputs
-command :: String -> Repl ()
-command = print
+evalPrint :: Text -> Repl ()
+evalPrint = print
+
+command :: (Text -> Repl ()) -> (String -> Repl ())
+command c = c . fromString
 
 prefix :: Maybe Char
 prefix = pure ':'
@@ -283,30 +288,52 @@ completer = R.Word cmp
   extend = flip filter
   toThis = ["kirk", "spock", "mccoy"]
 
-help :: Text -> Repl ()
-help = putTextLn . ("Help: " <>)
+newtype CommandName = CommandName Text
+ deriving (Eq, Ord, IsString)
 
-say :: Text -> Repl ()
-say arg =
-  liftIO (callCommand . toString $ "cowsay " <> arg)
+newtype CommandDocs = CommandDox Text
+ deriving (Eq, Ord, IsString, Semigroup)
+
+optionSet :: Map CommandName (CommandDocs, Text -> Repl ())
+optionSet = fromList
+  [
+    makeEntry "help" "documentation on REPL commands" help,
+    makeEntry "say" "" say
+  ]
+ where
+  makeEntry n d f = (crc n, (crc $ makeDoc n d, f))
+  makeDoc c d = Text.toUpper c <> "\n\nNAME\n\t" <> c <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> c <> "[command]\n\nDESCRIPTION\n\t" <> c <> ""
+
+  help :: Text -> Repl ()
+  help = putTextLn . ("Help: " <>)
+
+  say :: Text -> Repl ()
+  say arg =
+    liftIO (callCommand . toString $ "cowsay " <> arg)
+
 
 options :: R.Options Repl
-options =
-  [
-    ("help", help . fromString), -- ":help"
-    ("say", say . fromString) -- ":say"
-  ]
+options = undefined
 
 -- | What to do/print on entering REPL.
 initialiser :: Repl ()
-initialiser = putStrLn "Welcome!"
+initialiser =
+  putStrLn "Simple Lamba calculus REPL. Enter \":help\" for information."
 
 -- | What to do/print on Ctrl+D (aka user making exit)
 finalizer :: Repl R.ExitDecision
-finalizer = putStrLn "Goodbye!" $> R.Exit
+finalizer =
+  putStrLn "Goodbye!" $> R.Exit
 
 -- | Running the REPL
 main :: IO ()
-main = R.evalRepl banner (command . fromString) options prefix multilineCommand completer initialiser finalizer
-
--- evalRepl = R.evalRepl banner command options
+main =
+  R.evalRepl
+    banner
+    (command evalPrint)
+    options
+    prefix
+    multilineCommand
+    completer
+    initialiser
+    finalizer
