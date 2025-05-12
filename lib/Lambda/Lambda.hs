@@ -248,32 +248,38 @@ mk0 = mkLambdaTermBruijnIndex 0
 
 turnReadableThenParseBack :: LambdaTerm -> Either String LambdaTerm
 turnReadableThenParseBack = parseOnly parserLambdaTerm . (<> "\\n") . turnReadable
+
 -- *** REPL
 
 type Repl = R.HaskelineT IO
 
-banner :: R.MultiLine -> Repl Text
+banner :: R.MultiLine -> Repl String
 banner =
-  bool
-    (pure "This is a basic Lambda calculus REPL") -- If SingleLine - print banner
-    stub  -- If there are more than one line in REPL - does not print banner
+  pure . bool
+    "This is a basic Lambda calculus REPL" -- If SingleLine - print banner
+    "λ> "  -- If there are more than one line in REPL - does not print banner
     . (R.MultiLine /=)
 
-command :: R.Command Repl
-command = undefined
-
 -- Evaluation : handle each line user inputs
-cmd :: Text -> Repl ()
-cmd = print
+command :: String -> Repl ()
+command = print
+
+prefix :: Maybe Char
+prefix = pure ':'
+
+multilineCommand :: Maybe String
+multilineCommand = pure "paste"
 
 -- Tab Completion: return a completion for partial words entered
-completer :: Monad m => R.WordCompleter m
-completer n =
-  pure $
-      extend
-      toThis
-      $ isPrefixOf n
+completer :: R.CompleterStyle IO
+completer = R.Word cmp
  where
+  cmp :: [Char] -> IO [[Char]]
+  cmp n =
+    pure $
+        extend
+        toThis
+        $ isPrefixOf n
   extend = flip filter
   toThis = ["kirk", "spock", "mccoy"]
 
@@ -292,15 +298,15 @@ options =
   ]
 
 -- | What to do/print on entering REPL.
-ini :: Repl ()
-ini = putStrLn "Welcome!"
+initialiser :: Repl ()
+initialiser = putStrLn "Welcome!"
 
 -- | What to do/print on Ctrl+D (aka user making exit)
-final :: Repl R.ExitDecision
-final = putStrLn "Goodbye!" $> R.Exit
+finalizer :: Repl R.ExitDecision
+finalizer = putStrLn "Goodbye!" $> R.Exit
 
 -- | Running the REPL
 main :: IO ()
-main = R.evalRepl (const . pure $ "λ> ") (cmd . fromString) options (pure ':') (pure "paste") (R.Word completer) ini final
+main = R.evalRepl banner (command . fromString) options prefix multilineCommand completer initialiser finalizer
 
 -- evalRepl = R.evalRepl banner command options
