@@ -258,8 +258,8 @@ type Repl = R.HaskelineT IO
 banner :: R.MultiLine -> Repl String
 banner =
   pure . bool
-    "This is a basic Lambda calculus REPL" -- If SingleLine - print banner
-    "λ> "  -- If there are more than one line in REPL - does not print banner
+    mempty -- Multiline mode entry
+    "λ> "  -- Standart single line entry
     . (R.MultiLine /=)
 
 -- Evaluation : handle each line user inputs
@@ -323,7 +323,7 @@ initialiser =
 -- | What to do/print on Ctrl+D (aka user making exit)
 finalizer :: Repl R.ExitDecision
 finalizer =
-  putStrLn "Goodbye!" $> R.Exit
+  putStrLn mempty $> R.Exit
 
 -- | Running the REPL
 main :: IO ()
