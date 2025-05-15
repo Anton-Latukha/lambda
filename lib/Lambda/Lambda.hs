@@ -279,41 +279,67 @@ multilineCommand = pure "paste"
 completer :: R.CompleterStyle IO
 completer = R.Word cmp
  where
-  cmp :: [Char] -> IO [[Char]]
-  cmp n =
-    pure $
-     extend
-       toThis
-       $ isPrefixOf n
-  extend = flip filter
-  toThis = ["kirk", "spock", "mccoy"]
+  cmp :: String -> IO [String]
+  cmp =
+    pure .
+      extend to . from
+   where
+    from = isPrefixOf
+    extend = flip filter
+    to = ["kirk", "spock", "mccoy"]
 
 newtype CommandName = CommandName Text
- deriving (Eq, Ord, IsString)
+ deriving (Eq, Ord, IsString, ToString)
 
 newtype CommandDocs = CommandDox Text
  deriving (Eq, Ord, IsString, Semigroup)
 
-optionSet :: Map CommandName (CommandDocs, Text -> Repl ())
+type CommandComm = (Text -> Repl ())
+
+data Command = Command
+  { -- | Command name
+    name :: CommandName,
+    -- | Command docs
+    docs :: CommandDocs,
+    -- | Command function
+    comm :: CommandComm
+  }
+
+optionSet :: Map CommandName Command
 optionSet = fromList
   [
     makeEntry "help" "documentation on REPL commands" help,
     makeEntry "say" "" say
   ]
  where
-  makeEntry n d f = (crc n, (crc $ makeDoc n d, f))
+  makeEntry :: Text -> Text -> CommandComm -> (CommandName, Command)
+  makeEntry n d f =
+    (crc n, cmd)
+   where
+    cmd =
+      Command {
+        name = crc n,
+        docs = crc $ makeDoc n d,
+        comm = f
+      }
+
+  makeDoc :: Text -> Text -> Text
   makeDoc c d = Text.toUpper c <> "\n\nNAME\n\t" <> c <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> c <> "[command]\n\nDESCRIPTION\n\t" <> c <> ""
 
-  help :: Text -> Repl ()
+  help :: CommandComm
   help = putTextLn . ("Help: " <>)
 
-  say :: Text -> Repl ()
+  say :: CommandComm
   say arg =
     liftIO (callCommand . toString $ "cowsay " <> arg)
 
 
 options :: R.Options Repl
-options = undefined
+options = formOptionREPLMap <$> toList optionSet
+ where
+  formOptionREPLMap :: Command -> (String, String -> Repl ())
+  formOptionREPLMap c =
+    (toString $ name c, comm c . toText)
 
 -- | What to do/print on entering REPL.
 initialiser :: Repl ()
