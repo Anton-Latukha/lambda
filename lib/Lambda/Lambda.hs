@@ -375,20 +375,23 @@ finalizer =
 -- | Running the REPL
 main :: IO ()
 main =
-  R.evalRepl
-    banner
-    (command evalPrint)
-    options
-    prefix
-    multilineCommand
-    completer
-    initialiser
-    finalizer
- where
-  options :: R.Options Repl
-  options =
-    formOptionREPLMap <$> toList optionSet
+  do
+    runOutputUnitTests
+
+    R.evalRepl
+      banner
+      (command evalPrint)
+      options
+      prefix
+      multilineCommand
+      completer
+      initialiser
+      finalizer
    where
-    formOptionREPLMap :: Command -> (String, String -> Repl ())
-    formOptionREPLMap c =
-      (toString $ name c, comm c . toText)
+    options :: R.Options Repl
+    options =
+      formOptionREPLMap <$> toList optionSet
+     where
+      formOptionREPLMap :: Command -> (String, String -> Repl ())
+      formOptionREPLMap c =
+        (toString $ name c, comm c . toText)
