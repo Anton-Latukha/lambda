@@ -205,22 +205,25 @@ normalize = crc .
     substitute :: LambdaTerm -> BruijnIndex -> LambdaTerm -> LambdaTerm
     substitute v bji =
       caseLambdaTerm
-        (bool
+        searchIndexAndSubstituteOnMatch
+        recurseIntoBothBranches
+        recurseIntoFunction
+     where
+      searchIndexAndSubstituteOnMatch =
+        bool
           v  -- so substitution under index
           . PatLambdaTermBruijnIndex -- do `id` ("pass")
-          <*> -- patthrough into both brunches
+          <*> -- patthrough into both branches
             indexNotFound
-        )
-        --  (bool v . PatLambdaTermBruijnIndex <*> isThisThePlace)
-        (on PatLambdaTermApp (substituteWithValue bji))
-        substituteInDeeperFunction
-     where
-      indexNotFound = (crc bji /=)
-      substituteWithValue = substitute v
+       where
+        indexNotFound = (crc bji /=)
+      recurseIntoBothBranches =
+        on PatLambdaTermApp (substituteWithValue bji)
       -- | Outside Btuijn indexes increase +1 when enterning a scope of deeper function.
       --  2025-05-05: NOTE: This is considered costly compared to nameless encoding style. Since it increments/decrements all instances.
       --  2025-05-18: NOTE: `($!)` is experimental (just in case) for parser to recieve the full input, since it expects it at once.
-      substituteInDeeperFunction = substituteWithValue $! next bji
+      recurseIntoFunction = substituteWithValue $! next bji
+      substituteWithValue = substitute v
 
 
 -- *** Testing
