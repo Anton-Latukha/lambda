@@ -205,11 +205,11 @@ normalize = crc .
     substitute :: LambdaTerm -> BruijnIndex -> LambdaTerm -> LambdaTerm
     substitute v bji =
       caseLambdaTerm
-        (\ indx ->
-           bool
-             v  -- so substitution under index
-             (PatLambdaTermBruijnIndex indx)  -- do `id` ("pass")
-             $ indexNotFound indx
+        (bool
+          v  -- so substitution under index
+          . PatLambdaTermBruijnIndex -- do `id` ("pass")
+          <*> -- patthrough into both brunches
+            indexNotFound
         )
         --  (bool v . PatLambdaTermBruijnIndex <*> isThisThePlace)
         (on PatLambdaTermApp (substituteWithValue bji))
@@ -218,7 +218,9 @@ normalize = crc .
       indexNotFound = (crc bji /=)
       substituteWithValue = substitute v
       -- | Outside Btuijn indexes increase +1 when enterning a scope of deeper function.
-      substituteInDeeperFunction = substituteWithValue $! next bji -- 2025-05-05: NOTE: This is considered costly to nameless encoding style. Since it increments/decrements all instances.
+      --  2025-05-05: NOTE: This is considered costly compared to nameless encoding style. Since it increments/decrements all instances.
+      --  2025-05-18: NOTE: `($!)` is experimental (just in case) for parser to recieve the full input, since it expects it at once.
+      substituteInDeeperFunction = substituteWithValue $! next bji
 
 
 -- *** Testing
@@ -320,7 +322,9 @@ optionSet = fromList
   [
     makeEntry "help" "documentation on REPL commands" help,
     makeEntry "say" "" say,
-    makeEntry "norm" "Produce normal form" undefined
+    makeEntry "norm" "Produce normal form" norm,
+    makeEntry "print" "Echo what was put in" print,
+    makeEntry "showExpr" "Parse and print back lambda expression" showExpr
   ]
  where
   makeEntry :: Text -> Text -> CommandComm -> (CommandName, Command)
