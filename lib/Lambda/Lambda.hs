@@ -349,20 +349,16 @@ optionSet = fromList
   say arg =
     liftIO (callCommand . toString $ "cowsay " <> arg)
 
-  -- norm :: CommandCom
-  norm :: NLambdaTerm
-  norm = normExpr
-   where
-    normExpr :: NLambdaTerm
-    normExpr = normalize expr
+  norm :: CommandComm
+  norm =
+    putTextLn . fromEither . ((turnReadable . crc . normalize) <$>) . parse'
 
+  print :: CommandComm
+  print = putTextLn
 
-options :: R.Options Repl
-options = formOptionREPLMap <$> toList optionSet
- where
-  formOptionREPLMap :: Command -> (String, String -> Repl ())
-  formOptionREPLMap c =
-    (toString $ name c, comm c . toText)
+  showExpr :: CommandComm
+  showExpr =
+    putTextLn . fromEither . (turnReadable <$>) . parse'
 
 -- | What to do/print on entering REPL.
 initialiser :: Repl ()
@@ -386,3 +382,11 @@ main =
     completer
     initialiser
     finalizer
+ where
+  options :: R.Options Repl
+  options =
+    formOptionREPLMap <$> toList optionSet
+   where
+    formOptionREPLMap :: Command -> (String, String -> Repl ())
+    formOptionREPLMap c =
+      (toString $ name c, comm c . toText)
