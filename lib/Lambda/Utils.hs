@@ -19,6 +19,7 @@ module Lambda.Utils
   , whenFalse
   , monoid
   , whenJust
+  , fromEither
   , isPresent
   , handlePresence
   , whenText
@@ -219,6 +220,14 @@ whenJust =
   maybe
     mempty
 {-# inline whenJust #-}
+
+-- | Strip @Either@ structure (needs same type brunches).
+fromEither :: Either c c -> c
+fromEither =
+  either
+    id
+    id
+{-# inline fromEither #-}
 
 isPresent :: Foldable t => t a -> Bool
 isPresent = not . null
