@@ -276,10 +276,10 @@ banner =
     . (R.MultiLine /=)
 
 -- Evaluation : handle each line user inputs
-evalPrint :: Text -> Repl ()
+evalPrint :: CommandComm
 evalPrint = print
 
-command :: (Text -> Repl ()) -> (String -> Repl ())
+command :: CommandComm -> (String -> Repl ())
 command c = c . fromString
 
 prefix :: Maybe Char
@@ -320,15 +320,17 @@ data Command = Command
 
 -- | Set of all options (+ multiline mode command), available inside REPL.
 optionSet :: Map CommandName Command
-optionSet = fromList
-  [
-    makeEntry "help" "documentation on REPL commands" help,
-    makeEntry "say" "" say,
-    makeEntry "norm" "Produce normal form" norm,
-    makeEntry "print" "Echo what was put in" print,
-    makeEntry "showExpr" "Parse and print back lambda expression" showExpr
-  ]
+optionSet = fromList commandList
  where
+  commandList :: [(CommandName, Command)]
+  commandList =
+    [
+      makeEntry "help" "documentation on REPL commands" help,
+      makeEntry "say" "" say,
+      makeEntry "norm" "Produce normal form" norm,
+      makeEntry "print" "Echo what was put in" print,
+      makeEntry "showExpr" "Parse and print back lambda expression" showExpr
+    ]
   makeEntry :: Text -> Text -> CommandComm -> (CommandName, Command)
   makeEntry n d f =
     (crc n, cmd)
@@ -345,7 +347,13 @@ optionSet = fromList
   makeDoc c d = Text.toUpper c <> "\n\nNAME\n\t" <> c <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> c <> "[command]\n\nDESCRIPTION\n\t" <> c <> ""
 
   help :: CommandComm
-  help = putTextLn . ("Help: " <>)
+  help _ =
+    putTextLn $ "Help: " <> Text.concat (crc allCommands)
+   where
+    allCommands = fmap f commandList
+     where
+      f :: (CommandName, Command) -> CommandDocs
+      f (n, c) = docs c
 
   say :: CommandComm
   say arg =
@@ -353,14 +361,18 @@ optionSet = fromList
 
   norm :: CommandComm
   norm =
-    putTextLn . fromEither . ((turnReadable . crc . normalize) <$>) . parse'
+    parseThenApplyThenPrint (crc . normalize)
 
   print :: CommandComm
   print = putTextLn
 
   showExpr :: CommandComm
   showExpr =
-    putTextLn . fromEither . (turnReadable <$>) . parse'
+    parseThenApplyThenPrint id
+
+  parseThenApplyThenPrint :: (LambdaTerm -> LambdaTerm) -> CommandComm
+  parseThenApplyThenPrint f =
+    putTextLn . fromEither . ((turnReadable . f) <$>) . parse'
 
 -- | What to do/print on entering REPL.
 initialiser :: Repl ()
