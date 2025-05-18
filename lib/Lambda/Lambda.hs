@@ -248,8 +248,17 @@ lambdaTermUnitTests =
 mk0 :: LambdaTerm
 mk0 = mkLambdaTermBruijnIndex 0
 
-turnReadableThenParseBack :: LambdaTerm -> Either String LambdaTerm
-turnReadableThenParseBack = parseOnly parserLambdaTerm . (<> "\\n") . turnReadable
+-- | Parse the expression recieved.
+-- Wrapper around `parseOnly`, so expects full expression at once, hence strict.
+parse' :: Text -> Either Text LambdaTerm
+parse' =
+  either
+    (Left . fromString)
+    pure
+    . parseOnly parserLambdaTerm . (<> "\\n")
+
+turnReadableThenParseBack :: LambdaTerm -> Either Text LambdaTerm
+turnReadableThenParseBack = parse' . turnReadable
 
 -- *** REPL
 
@@ -275,7 +284,7 @@ prefix = pure ':'
 multilineCommand :: Maybe String
 multilineCommand = pure "paste"
 
--- Tab Completion: return a completion for partial words entered
+-- | Tab Completion: return a completion for partial words entered
 completer :: R.CompleterStyle IO
 completer = R.Word cmp
  where
@@ -305,11 +314,13 @@ data Command = Command
     comm :: CommandComm
   }
 
+-- | Set of all options (+ multiline mode command), available inside REPL.
 optionSet :: Map CommandName Command
 optionSet = fromList
   [
     makeEntry "help" "documentation on REPL commands" help,
-    makeEntry "say" "" say
+    makeEntry "say" "" say,
+    makeEntry "norm" "Produce normal form" undefined
   ]
  where
   makeEntry :: Text -> Text -> CommandComm -> (CommandName, Command)
@@ -323,6 +334,7 @@ optionSet = fromList
         comm = f
       }
 
+  -- | Doc builder
   makeDoc :: Text -> Text -> Text
   makeDoc c d = Text.toUpper c <> "\n\nNAME\n\t" <> c <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> c <> "[command]\n\nDESCRIPTION\n\t" <> c <> ""
 
@@ -332,6 +344,13 @@ optionSet = fromList
   say :: CommandComm
   say arg =
     liftIO (callCommand . toString $ "cowsay " <> arg)
+
+  -- norm :: CommandCom
+  norm :: NLambdaTerm
+  norm = normExpr
+   where
+    normExpr :: NLambdaTerm
+    normExpr = normalize expr
 
 
 options :: R.Options Repl
