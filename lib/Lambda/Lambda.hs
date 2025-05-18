@@ -249,13 +249,13 @@ mk0 :: LambdaTerm
 mk0 = mkLambdaTermBruijnIndex 0
 
 -- | Parse the expression recieved.
--- Wrapper around `parseOnly`, so expects full expression at once, hence strict.
+-- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
 parse' :: Text -> Either Text LambdaTerm
-parse' =
+parse' t =
   either
     (Left . fromString)
     pure
-    . parseOnly parserLambdaTerm . (<> "\\n")
+    . parseOnly parserLambdaTerm $! (<> "\\n") t
 
 turnReadableThenParseBack :: LambdaTerm -> Either Text LambdaTerm
 turnReadableThenParseBack = parse' . turnReadable
