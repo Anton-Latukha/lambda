@@ -326,7 +326,7 @@ optionSet = fromList commandList
   commandList =
     [
       makeEntry "help" "documentation on REPL commands" help,
-      makeEntry "say" "" say,
+      makeEntry "cowsay" "" cowsay,
       makeEntry "norm" "Produce normal form" norm,
       makeEntry "print" "Echo what was put in" print,
       makeEntry "showExpr" "Parse and print back lambda expression" showExpr
@@ -348,15 +348,14 @@ optionSet = fromList commandList
 
   help :: CommandComm
   help _ =
-    putTextLn $ "Help: " <> Text.concat (crc allCommands)
+    putTextLn $ "Help: " <> Text.concat (crc allDocs)
    where
-    allCommands = fmap f commandList
-     where
-      f :: (CommandName, Command) -> CommandDocs
-      f (n, c) = docs c
+    allDocs :: [CommandDocs]
+    allDocs =
+      docs . snd <$> commandList
 
-  say :: CommandComm
-  say arg =
+  cowsay :: CommandComm
+  cowsay arg =
     liftIO (callCommand . toString $ "cowsay " <> arg)
 
   norm :: CommandComm
