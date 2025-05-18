@@ -377,6 +377,7 @@ main :: IO ()
 main =
   do
     runOutputUnitTests
+    runParserUnitTests
 
     R.evalRepl
       banner
