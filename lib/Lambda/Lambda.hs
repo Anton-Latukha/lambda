@@ -218,12 +218,11 @@ normalize = crc .
        where
         indexNotFound = (crc bji /=)
       recurseIntoBothBranches =
-        on PatLambdaTermApp (substituteWithValue bji)
+        on PatLambdaTermApp (substituteWithPermutatedIndex id)
       -- | Outside Btuijn indexes increase +1 when enterning a scope of deeper function.
       --  2025-05-05: NOTE: This is considered costly compared to nameless encoding style. Since it increments/decrements all instances.
-      --  2025-05-18: NOTE: `($!)` is experimental (just in case) for parser to recieve the full input, since it expects it at once.
-      recurseIntoFunction = substituteWithValue $! next bji
-      substituteWithValue = substitute v
+      recurseIntoFunction = substituteWithPermutatedIndex next
+      substituteWithPermutatedIndex f = substitute v (f bji)
 
 
 -- *** Testing
