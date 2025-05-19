@@ -9,6 +9,7 @@ module Lambda.Lambda
 
 import Lambda.Prelude
 import Relude.Extra.Enum (prev, next)
+import Relude.Extra.Map
 import qualified Text.Show
 import qualified Data.Text as Text
 import Data.Attoparsec.Text
@@ -320,8 +321,12 @@ data Command = Command
 
 -- | Set of all options (+ multiline mode command), available inside REPL.
 optionSet :: Map CommandName Command
-optionSet = fromList commandList
+optionSet = fullMap
  where
+  -- | It is internalized to have optimized internal recursive search to produce `:help` output
+  fullMap :: Map CommandName Command
+  fullMap = fromList commandList
+
   commandList :: [(CommandName, Command)]
   commandList =
     [
@@ -338,25 +343,43 @@ optionSet = fromList commandList
     cmd =
       Command {
         name = crc n,
-        docs = crc $ makeDoc n d,
+        docs = crc $ commandDocBuilder n d,
         comm = f
       }
 
   -- | Doc builder
-  makeDoc :: Text -> Text -> Text
-  makeDoc c d = Text.toUpper c <> "\n\nNAME\n\t" <> c <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> c <> "[command]\n\nDESCRIPTION\n\t" <> c <> ""
+  commandDocBuilder :: Text -> Text -> Text
+  commandDocBuilder c d = Text.toUpper c <> "\n\nNAME\n\t" <> c <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> c <> "[command]\n\nDESCRIPTION\n\t" <> c <> ""
 
   help :: CommandComm
-  help _ =
-    putTextLn $ "Help: " <> Text.concat (crc allDocs)
+  help =
+    whenText
+      outputWhenNoArgument
+      outputWhenParticularCommand
    where
-    allDocs :: [CommandDocs]
-    allDocs =
-      docs . snd <$> commandList
+    outputWhenNoArgument :: Repl ()
+    outputWhenNoArgument =
+      helpPreamble $ Text.concat $ crc allDocs
+     where
+      allDocs :: [CommandDocs]
+      allDocs =
+        docs . snd <$> commandList
+    outputWhenParticularCommand :: Text -> Repl ()
+    outputWhenParticularCommand =
+      helpPreamble . outputParticularCommand
+     where
+      outputParticularCommand :: Text -> Text
+      outputParticularCommand a =
+        maybe
+          ("The '" <> a <> "' not found and not supported, check the simple `:help` for all supported commands.")
+          (crc . docs)
+          $ lookup (crc a) fullMap
+    helpPreamble =
+      putTextLn . ("Help: " <>)
 
   cowsay :: CommandComm
-  cowsay arg =
-    liftIO (callCommand . toString $ "cowsay " <> arg)
+  cowsay =
+    liftIO . callCommand . toString . ("cowsay " <>)
 
   norm :: CommandComm
   norm =
