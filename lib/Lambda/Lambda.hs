@@ -267,9 +267,9 @@ turnReadableThenParseBack = parse' . turnReadable
 
 -- *** REPL
 
-type Repl = R.HaskelineT IO
+type Repl = R.HaskelineT IO ()
 
-banner :: R.MultiLine -> Repl String
+banner :: R.MultiLine -> R.HaskelineT IO String
 banner =
   pure . bool
     mempty -- Multiline mode entry
@@ -277,10 +277,10 @@ banner =
     . (R.MultiLine /=)
 
 -- Evaluation : handle each line user inputs
-evalPrint :: CommandComm
+evalPrint :: Text -> Repl
 evalPrint = print
 
-command :: CommandComm -> (String -> Repl ())
+command :: (Text -> Repl) -> (String -> Repl)
 command c = c . fromString
 
 prefix :: Maybe Char
@@ -298,9 +298,9 @@ completer = R.Word cmp
     pure .
       extend to . from
    where
-    from = isPrefixOf
     extend = flip filter
-    to = ["kirk", "spock", "mccoy"]
+    to     = ["kirk", "spock", "mccoy"]
+    from   = isPrefixOf
 
 newtype CommandName = CommandName Text
  deriving (Eq, Ord, IsString, ToString)
@@ -308,15 +308,13 @@ newtype CommandName = CommandName Text
 newtype CommandDocs = CommandDox Text
  deriving (Eq, Ord, IsString, Semigroup)
 
-type CommandComm = (Text -> Repl ())
-
 data Command = Command
   { -- | Command name
     name :: CommandName,
     -- | Command docs
     docs :: CommandDocs,
     -- | Command function
-    comm :: CommandComm
+    comm :: Text -> Repl
   }
 
 -- | Set of all options (+ multiline mode command), available inside REPL.
@@ -336,7 +334,7 @@ optionSet = fullMap
       makeEntry "print" "Echo what was put in" print,
       makeEntry "showExpr" "Parse and print back lambda expression" showExpr
     ]
-  makeEntry :: Text -> Text -> CommandComm -> (CommandName, Command)
+  makeEntry :: Text -> Text -> (Text -> Repl) -> (CommandName, Command)
   makeEntry n d f =
     (crc n, cmd)
    where
@@ -351,20 +349,20 @@ optionSet = fullMap
   commandDocBuilder :: Text -> Text -> Text
   commandDocBuilder c d = Text.toUpper c <> "\n\nNAME\n\t" <> c <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> c <> "[command]\n\nDESCRIPTION\n\t" <> c <> ""
 
-  help :: CommandComm
+  help :: Text -> Repl
   help =
     whenText
       outputWhenNoArgument
       outputWhenParticularCommand
    where
-    outputWhenNoArgument :: Repl ()
+    outputWhenNoArgument :: Repl
     outputWhenNoArgument =
       helpPreamble $ Text.concat $ crc allDocs
      where
       allDocs :: [CommandDocs]
       allDocs =
         docs . snd <$> commandList
-    outputWhenParticularCommand :: Text -> Repl ()
+    outputWhenParticularCommand :: Text -> Repl
     outputWhenParticularCommand =
       helpPreamble . outputParticularCommand
      where
@@ -377,32 +375,32 @@ optionSet = fullMap
     helpPreamble =
       putTextLn . ("Help: " <>)
 
-  cowsay :: CommandComm
+  cowsay :: Text -> Repl
   cowsay =
     liftIO . callCommand . toString . ("cowsay " <>)
 
-  norm :: CommandComm
+  norm :: Text -> Repl
   norm =
     parseThenApplyThenPrint (crc . normalize)
 
-  print :: CommandComm
+  print :: Text -> Repl
   print = putTextLn
 
-  showExpr :: CommandComm
+  showExpr :: Text -> Repl
   showExpr =
     parseThenApplyThenPrint id
 
-  parseThenApplyThenPrint :: (LambdaTerm -> LambdaTerm) -> CommandComm
+  parseThenApplyThenPrint :: (LambdaTerm -> LambdaTerm) -> Text -> Repl
   parseThenApplyThenPrint f =
     putTextLn . fromEither . ((turnReadable . f) <$>) . parse'
 
 -- | What to do/print on entering REPL.
-initialiser :: Repl ()
+initialiser :: Repl
 initialiser =
   putStrLn "Simple Lamba calculus REPL. Enter \":help\" for information."
 
 -- | What to do/print on Ctrl+D (aka user making exit)
-finalizer :: Repl R.ExitDecision
+finalizer :: R.HaskelineT IO R.ExitDecision
 finalizer =
   putStrLn mempty $> R.Exit
 
@@ -423,10 +421,10 @@ main =
       initialiser
       finalizer
    where
-    options :: R.Options Repl
+    options :: R.Options (R.HaskelineT IO)
     options =
       formOptionREPLMap <$> toList optionSet
      where
-      formOptionREPLMap :: Command -> (String, String -> Repl ())
+      formOptionREPLMap :: Command -> (String, String -> Repl)
       formOptionREPLMap c =
         (toString $ name c, comm c . toText)
