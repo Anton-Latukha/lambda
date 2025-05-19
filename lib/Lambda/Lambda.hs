@@ -269,38 +269,8 @@ turnReadableThenParseBack = parse' . turnReadable
 
 type Repl = R.HaskelineT IO ()
 
-banner :: R.MultiLine -> R.HaskelineT IO String
-banner =
-  pure . bool
-    mempty -- Multiline mode entry
-    "λ> "  -- Standart single line entry
-    . (R.MultiLine /=)
-
--- Evaluation : handle each line user inputs
-evalPrint :: Text -> Repl
-evalPrint = print
-
 command :: (Text -> Repl) -> (String -> Repl)
 command c = c . fromString
-
-prefix :: Maybe Char
-prefix = pure ':'
-
-multilineCommand :: Maybe String
-multilineCommand = pure "paste"
-
--- | Tab Completion: return a completion for partial words entered
-completer :: R.CompleterStyle IO
-completer = R.Word cmp
- where
-  cmp :: String -> IO [String]
-  cmp =
-    pure .
-      extend to . from
-   where
-    extend = flip filter
-    to     = ["kirk", "spock", "mccoy"]
-    from   = isPrefixOf
 
 newtype CommandName = CommandName Text
  deriving (Eq, Ord, IsString, ToString)
@@ -331,7 +301,7 @@ optionSet = fullMap
       makeEntry "help" "documentation on REPL commands" help,
       makeEntry "cowsay" "" cowsay,
       makeEntry "norm" "Produce normal form" norm,
-      makeEntry "print" "Echo what was put in" print,
+      makeEntry "print" "Echo what was put in" putTextLn,
       makeEntry "showExpr" "Parse and print back lambda expression" showExpr
     ]
   makeEntry :: Text -> Text -> (Text -> Repl) -> (CommandName, Command)
@@ -347,7 +317,7 @@ optionSet = fullMap
 
   -- | Doc builder
   commandDocBuilder :: Text -> Text -> Text
-  commandDocBuilder c d = Text.toUpper c <> "\n\nNAME\n\t" <> c <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> c <> "[command]\n\nDESCRIPTION\n\t" <> c <> ""
+  commandDocBuilder c d = "\n\n>:" <> c <> "\n\nNAME\n\t" <> c <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> c <> " [command]\n\nDESCRIPTION\n\t" <> c <> ""
 
   help :: Text -> Repl
   help =
@@ -383,9 +353,6 @@ optionSet = fullMap
   norm =
     parseThenApplyThenPrint (crc . normalize)
 
-  print :: Text -> Repl
-  print = putTextLn
-
   showExpr :: Text -> Repl
   showExpr =
     parseThenApplyThenPrint id
@@ -393,16 +360,6 @@ optionSet = fullMap
   parseThenApplyThenPrint :: (LambdaTerm -> LambdaTerm) -> Text -> Repl
   parseThenApplyThenPrint f =
     putTextLn . fromEither . ((turnReadable . f) <$>) . parse'
-
--- | What to do/print on entering REPL.
-initialiser :: Repl
-initialiser =
-  putStrLn "Simple Lamba calculus REPL. Enter \":help\" for information."
-
--- | What to do/print on Ctrl+D (aka user making exit)
-finalizer :: R.HaskelineT IO R.ExitDecision
-finalizer =
-  putStrLn mempty $> R.Exit
 
 -- | Running the REPL
 main :: IO ()
@@ -421,6 +378,17 @@ main =
       initialiser
       finalizer
    where
+    banner :: R.MultiLine -> R.HaskelineT IO String
+    banner =
+      pure . bool
+        mempty -- Multiline mode entry
+        "λ> "  -- Standart single line entry
+        . (R.MultiLine /=)
+
+    -- Evaluation : handle each line user inputs
+    evalPrint :: Text -> Repl
+    evalPrint = putTextLn
+
     options :: R.Options (R.HaskelineT IO)
     options =
       formOptionREPLMap <$> toList optionSet
@@ -428,3 +396,32 @@ main =
       formOptionREPLMap :: Command -> (String, String -> Repl)
       formOptionREPLMap c =
         (toString $ name c, comm c . toText)
+
+    prefix :: Maybe Char
+    prefix = pure ':'
+
+    multilineCommand :: Maybe String
+    multilineCommand = pure "paste"
+
+    -- | Tab Completion: return a completion for partial words entered
+    completer :: R.CompleterStyle IO
+    completer = R.Word cmp
+     where
+      cmp :: String -> IO [String]
+      cmp =
+        pure .
+          extend to . from
+       where
+        extend = flip filter
+        to     = ["kirk", "spock", "mccoy"]
+        from   = isPrefixOf
+
+    -- | What to do/print on entering REPL.
+    initialiser :: Repl
+    initialiser =
+      putStrLn "Simple Lamba calculus REPL. Enter \":help\" for information."
+
+    -- | What to do/print on Ctrl+D (aka user making exit)
+    finalizer :: R.HaskelineT IO R.ExitDecision
+    finalizer =
+      putStrLn mempty $> R.Exit
