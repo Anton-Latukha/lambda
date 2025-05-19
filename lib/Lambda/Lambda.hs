@@ -1,5 +1,6 @@
 {-# language PatternSynonyms #-}
 {-# language PartialTypeSignatures #-}
+{-# language StrictData #-}
 
 module Lambda.Lambda
   ( main
@@ -8,7 +9,7 @@ module Lambda.Lambda
 -- ** Import
 
 import Lambda.Prelude
-import Relude.Extra.Enum (prev, next)
+import Relude.Extra.Enum (next)
 import Relude.Extra.Map
 import qualified Text.Show
 import qualified Data.Text as Text
@@ -298,11 +299,11 @@ optionSet = fullMap
   commandList :: [(CommandName, Command)]
   commandList =
     [
-      makeEntry "help" "documentation on REPL commands" help,
-      makeEntry "cowsay" "" cowsay,
-      makeEntry "norm" "Produce normal form" norm,
-      makeEntry "print" "Echo what was put in" putTextLn,
-      makeEntry "showExpr" "Parse and print back lambda expression" showExpr
+      makeEntry "help"     "documentation on REPL commands"         help,
+      makeEntry "print"    "Echo what was put in"                   putTextLn,
+      makeEntry "showExpr" "Parse and print back lambda expression" showExpr,
+      makeEntry "norm"     "Produce normal form"                    norm,
+      makeEntry "cowsay"   ""                                       cowsay
     ]
   makeEntry :: Text -> Text -> (Text -> Repl) -> (CommandName, Command)
   makeEntry n d f =
