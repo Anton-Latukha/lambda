@@ -293,11 +293,10 @@ optionSet :: Map CommandName Command
 optionSet = fullMap
  where
   -- | It is internalized to have optimized internal recursive search to produce `:help` output
-  fullMap :: Map CommandName Command
-  fullMap = fromList commandList
+  fullMap :: Map CommandName Command =
+    fromList commandList
 
-  commandList :: [(CommandName, Command)]
-  commandList =
+  commandList :: [(CommandName, Command)] =
     [
       makeEntry "help"     "documentation on REPL commands"         help,
       makeEntry "print"    "Echo what was put in"                   putTextLn,
@@ -305,20 +304,19 @@ optionSet = fullMap
       makeEntry "norm"     "Produce normal form"                    norm,
       makeEntry "cowsay"   ""                                       cowsay
     ]
-  makeEntry :: Text -> Text -> (Text -> Repl) -> (CommandName, Command)
-  makeEntry n d f =
-    (crc n, cmd)
+  makeEntry :: CommandName -> Text -> (Text -> Repl) -> (CommandName, Command)
+  makeEntry n d f = (n, cmd)
    where
     cmd =
       Command {
-        name = crc n,
-        docs = crc $ commandDocBuilder n d,
+        name = n,
+        docs = commandDocBuilder n d,
         comm = f
       }
 
   -- | Doc builder
-  commandDocBuilder :: Text -> Text -> Text
-  commandDocBuilder c d = "\n\n>:" <> c <> "\n\nNAME\n\t" <> c <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> c <> " [command]\n\nDESCRIPTION\n\t" <> c <> ""
+  commandDocBuilder :: CommandName -> Text -> CommandDocs
+  commandDocBuilder (crc -> c) d = crc $ "\n\n>:" <> c <> "\n\nNAME\n\t" <> c <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> c <> " [command]\n\nDESCRIPTION\n\t" <> c <> ""
 
   help :: Text -> Repl
   help =
@@ -326,12 +324,10 @@ optionSet = fullMap
       outputWhenNoArgument
       outputWhenParticularCommand
    where
-    outputWhenNoArgument :: Repl
-    outputWhenNoArgument =
+    outputWhenNoArgument :: Repl =
       helpPreamble $ Text.concat $ crc allDocs
      where
-      allDocs :: [CommandDocs]
-      allDocs =
+      allDocs :: [CommandDocs] =
         docs . snd <$> commandList
     outputWhenParticularCommand :: Text -> Repl
     outputWhenParticularCommand =
@@ -390,23 +386,22 @@ main =
     evalPrint :: Text -> Repl
     evalPrint = putTextLn
 
-    options :: R.Options (R.HaskelineT IO)
-    options =
+    options :: R.Options (R.HaskelineT IO) =
       formOptionREPLMap <$> toList optionSet
      where
       formOptionREPLMap :: Command -> (String, String -> Repl)
       formOptionREPLMap c =
         (toString $ name c, comm c . toText)
 
-    prefix :: Maybe Char
-    prefix = pure ':'
+    prefix :: Maybe Char =
+      pure ':'
 
-    multilineCommand :: Maybe String
-    multilineCommand = pure "paste"
+    multilineCommand :: Maybe String =
+      pure "paste"
 
     -- | Tab Completion: return a completion for partial words entered
-    completer :: R.CompleterStyle IO
-    completer = R.Word cmp
+    completer :: R.CompleterStyle IO=
+      R.Word cmp
      where
       cmp :: String -> IO [String]
       cmp =
@@ -418,11 +413,9 @@ main =
         from   = isPrefixOf
 
     -- | What to do/print on entering REPL.
-    initialiser :: Repl
-    initialiser =
+    initialiser :: Repl =
       putStrLn "Simple Lamba calculus REPL. Enter \":help\" for information."
 
     -- | What to do/print on Ctrl+D (aka user making exit)
-    finalizer :: R.HaskelineT IO R.ExitDecision
-    finalizer =
+    finalizer :: R.HaskelineT IO R.ExitDecision =
       putStrLn mempty $> R.Exit
