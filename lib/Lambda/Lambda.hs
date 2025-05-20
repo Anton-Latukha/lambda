@@ -65,12 +65,16 @@ instance Steppable (->) LambdaTerm LambdaTermF where
 
 instance Eq1 LambdaTermF where
   liftEq :: (a -> b -> Bool) -> LambdaTermF a -> LambdaTermF b -> Bool
-  liftEq = go  -- Making shure GHC detects that there is no point to go through typeclass dictionary searches, all other instances derive from here.
+  --  2025-05-20: FIXME: eq function `(a -> b -> Bool)` is ignored.
+  -- If there was Applicative to `LambdaTermF` the implementation then is `fold $ liftA2 eq a b`
+  liftEq _ = go  -- Making shure GHC detects that there is no point to go through typeclass dictionary searches, all other instances derive from here.
    where
-    go eq (LambdaTermFLam    b1   ) (LambdaTermFLam    b2   ) = crc go eq b1 b2
-    go eq (LambdaTermFApp    f1 p1) (LambdaTermFApp    f2 p2) = crc go eq f1 f2 && crc go eq p1 p2
-    go _  (LambdaTermFBruijnIndex idx1 ) (LambdaTermFBruijnIndex idx2 ) = idx1 == idx2
-    go _ _ _ = False
+    go (LambdaTermFLam           b1 ) (LambdaTermFLam           b2 ) =      crc go b1 b2
+    go (LambdaTermFApp        f1 p1 ) (LambdaTermFApp        f2 p2 ) = (&&) (crc go f1 f2)
+                                                                           (crc go p1 p2)
+    go (LambdaTermFBruijnIndex idx1 ) (LambdaTermFBruijnIndex idx2 ) = (==) idx1
+                                                                           idx2
+    go _ _ = False
 
 -- **** Finished LambdaTerm
 
