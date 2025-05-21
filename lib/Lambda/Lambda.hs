@@ -24,7 +24,9 @@ import System.Process (callCommand)
 
 -- *** Initial type primitive boundaries
 
--- **** New type typisation
+-- **** New type typisation for closed Lambda term
+
+-- | If Lambda term has no free variables, it is called Closed.
 
 -- | Bruijn index in lambda term.
 -- Index < number of external lambda binds => index == binded lambda value
@@ -32,185 +34,183 @@ import System.Process (callCommand)
 newtype BruijnIndex = BruijnIndex Int
  deriving (Eq, Enum, Num, Bounded, Show, Generic)
 
-newtype LambdaTermFAppFunc a = LambdaTermFAppFunc (LambdaTermF a)
+newtype ClosedLambdaTermFAppFunc a = ClosedLambdaTermFAppFunc (ClosedLambdaTermF a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
-newtype LambdaTermFAppParam a = LambdaTermFAppParam (LambdaTermF a)
+newtype ClosedLambdaTermFAppParam a = ClosedLambdaTermFAppParam (ClosedLambdaTermF a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
-newtype LambdaTermFLamBody a = LambdaTermFLamBody (LambdaTermF a)
+newtype ClosedLambdaTermFLamBody a = ClosedLambdaTermFLamBody (ClosedLambdaTermF a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
 -- **** Functorial Lambda term/expression
 
-data LambdaTermF a
-  = LambdaTermFBruijnIndex !BruijnIndex
-  | LambdaTermFApp    !(LambdaTermFAppFunc a) !(LambdaTermFAppParam a)
-  | LambdaTermFLam    !(LambdaTermFLamBody a)
+data ClosedLambdaTermF a
+  = ClosedLambdaTermFBruijnIndex !BruijnIndex
+  | ClosedLambdaTermFApp    !(ClosedLambdaTermFAppFunc a) !(ClosedLambdaTermFAppParam a)
+  | ClosedLambdaTermFLam    !(ClosedLambdaTermFLamBody a)
  deriving (Eq, Show, Generic, Functor, Traversable, Foldable)
 
 -- ***** Instances
 
-instance Recursive (->) LambdaTerm LambdaTermF where
-  cata :: Algebra (->) LambdaTermF a -> LambdaTerm -> a
-  cata φ (LambdaTerm (Mu f)) = f φ
+instance Recursive (->) ClosedLambdaTerm ClosedLambdaTermF where
+  cata :: Algebra (->) ClosedLambdaTermF a -> ClosedLambdaTerm -> a
+  cata φ (ClosedLambdaTerm (Mu f)) = f φ
 
-instance Projectable (->) LambdaTerm LambdaTermF where
-  project :: Coalgebra (->) LambdaTermF LambdaTerm
+instance Projectable (->) ClosedLambdaTerm ClosedLambdaTermF where
+  project :: Coalgebra (->) ClosedLambdaTermF ClosedLambdaTerm
   project = lambek
 
-instance Steppable (->) LambdaTerm LambdaTermF where
-  embed :: Algebra (->) LambdaTermF LambdaTerm
-  embed m = LambdaTerm $ Mu $ \ f -> f $ fmap (cata f) m
+instance Steppable (->) ClosedLambdaTerm ClosedLambdaTermF where
+  embed :: Algebra (->) ClosedLambdaTermF ClosedLambdaTerm
+  embed m = ClosedLambdaTerm $ Mu $ \ f -> f $ fmap (cata f) m
 
-instance Eq1 LambdaTermF where
-  liftEq :: (a -> b -> Bool) -> LambdaTermF a -> LambdaTermF b -> Bool
+instance Eq1 ClosedLambdaTermF where
+  liftEq :: (a -> b -> Bool) -> ClosedLambdaTermF a -> ClosedLambdaTermF b -> Bool
   --  2025-05-20: FIXME: eq function `(a -> b -> Bool)` is ignored.
-  -- If there was Applicative to `LambdaTermF` the implementation then is `fold $ liftA2 eq a b`
+  -- If there was Applicative to `ClosedLambdaTermF` the implementation then is `fold $ liftA2 eq a b`
   liftEq _ = go  -- Making shure GHC detects that there is no point to go through typeclass dictionary searches, all other instances derive from here.
    where
-    go (LambdaTermFLam           b1 ) (LambdaTermFLam           b2 ) =      crc go b1 b2
-    go (LambdaTermFApp        f1 p1 ) (LambdaTermFApp        f2 p2 ) = (&&) (crc go f1 f2)
+    go (ClosedLambdaTermFLam           b1 ) (ClosedLambdaTermFLam           b2 ) =      crc go b1 b2
+    go (ClosedLambdaTermFApp        f1 p1 ) (ClosedLambdaTermFApp        f2 p2 ) = (&&) (crc go f1 f2)
                                                                            (crc go p1 p2)
-    go (LambdaTermFBruijnIndex idx1 ) (LambdaTermFBruijnIndex idx2 ) = (==) idx1
+    go (ClosedLambdaTermFBruijnIndex idx1 ) (ClosedLambdaTermFBruijnIndex idx2 ) = (==) idx1
                                                                            idx2
     go _ _ = False
 
--- **** Finished LambdaTerm
+-- **** Finished ClosedLambdaTerm
 
-newtype LambdaTerm = LambdaTerm (Mu LambdaTermF)
+newtype ClosedLambdaTerm = ClosedLambdaTerm (Mu ClosedLambdaTermF)
  deriving (Eq, Generic)
 
 -- *** Isomorphism of lambda term to human readable representation
 
 -- | Abstraction for representation of human readable view of the main lambda term datatype
-newtype LambdaTermBJHumanReadable = LambdaTermBJHumanReadable LambdaTerm
+newtype ClosedLambdaTermBJHumanReadable = ClosedLambdaTermBJHumanReadable ClosedLambdaTerm
 
 -- **** Instances
 
-instance Show LambdaTermBJHumanReadable where
-  show :: LambdaTermBJHumanReadable -> String
+instance Show ClosedLambdaTermBJHumanReadable where
+  show :: ClosedLambdaTermBJHumanReadable -> String
   show = l_showHR . crc
    where
     -- | There is a newtype boundary between main lambda term data type and human readable, code prefers to preserve the general GHC derived @Show@ instances for the general case (showing term/expression internals) for the lambda term and its components, which is why this coersion enforsment is needed.
-    l_showHR :: LambdaTerm -> String
+    l_showHR :: ClosedLambdaTerm -> String
     l_showHR =
-      caseLambdaTerm
+      caseClosedLambdaTerm
         show
         showApp
         showLam
      where
-      showApp :: LambdaTerm -> LambdaTerm -> String
+      showApp :: ClosedLambdaTerm -> ClosedLambdaTerm -> String
       showApp f a = "(" <> l_showHR f <> ") " <> l_showHR a
-      showLam :: LambdaTerm -> String
+      showLam :: ClosedLambdaTerm -> String
       showLam b = "\\ " <> l_showHR b
 
-instance Show LambdaTerm where
-  show :: LambdaTerm -> String
-  show (crc @LambdaTermBJHumanReadable -> a) = show a
+instance Show ClosedLambdaTerm where
+  show :: ClosedLambdaTerm -> String
+  show (crc @ClosedLambdaTermBJHumanReadable -> a) = show a
 
 -- **** Functions
 
-turnReadable :: LambdaTerm -> Text
-turnReadable = show . LambdaTermBJHumanReadable
+turnReadable :: ClosedLambdaTerm -> Text
+turnReadable = show . ClosedLambdaTermBJHumanReadable
 
 -- *** Patterns
 
-pattern PatLambdaTermBruijnIndex :: Int -> LambdaTerm
-pattern PatLambdaTermBruijnIndex n <- (project -> LambdaTermFBruijnIndex (BruijnIndex n)) where
-        PatLambdaTermBruijnIndex n =     embed (  LambdaTermFBruijnIndex (BruijnIndex n))
+pattern PatClosedLambdaTermBruijnIndex :: Int -> ClosedLambdaTerm
+pattern PatClosedLambdaTermBruijnIndex n <- (project -> ClosedLambdaTermFBruijnIndex (BruijnIndex n)) where
+        PatClosedLambdaTermBruijnIndex n =     embed (  ClosedLambdaTermFBruijnIndex (BruijnIndex n))
 
-pattern PatLambdaTermApp :: LambdaTerm -> LambdaTerm -> LambdaTerm
-pattern PatLambdaTermApp f a <- (project -> LambdaTermFApp (LambdaTermFAppFunc (embed -> f)) (LambdaTermFAppParam (embed -> a))) where
-        PatLambdaTermApp f a =     embed (  LambdaTermFApp (LambdaTermFAppFunc (project  f)) (LambdaTermFAppParam (project  a)))
+pattern PatClosedLambdaTermApp :: ClosedLambdaTerm -> ClosedLambdaTerm -> ClosedLambdaTerm
+pattern PatClosedLambdaTermApp f a <- (project -> ClosedLambdaTermFApp (ClosedLambdaTermFAppFunc (embed -> f)) (ClosedLambdaTermFAppParam (embed -> a))) where
+        PatClosedLambdaTermApp f a =     embed (  ClosedLambdaTermFApp (ClosedLambdaTermFAppFunc (project  f)) (ClosedLambdaTermFAppParam (project  a)))
 
-pattern PatLambdaTermLam :: LambdaTerm -> LambdaTerm
-pattern PatLambdaTermLam b <- (project -> LambdaTermFLam (LambdaTermFLamBody (embed -> b))) where
-        PatLambdaTermLam b =     embed (  LambdaTermFLam (LambdaTermFLamBody (project  b)))
+pattern PatClosedLambdaTermLam :: ClosedLambdaTerm -> ClosedLambdaTerm
+pattern PatClosedLambdaTermLam b <- (project -> ClosedLambdaTermFLam (ClosedLambdaTermFLamBody (embed -> b))) where
+        PatClosedLambdaTermLam b =     embed (  ClosedLambdaTermFLam (ClosedLambdaTermFLamBody (project  b)))
 
-{-# complete PatLambdaTermBruijnIndex, PatLambdaTermApp, PatLambdaTermLam #-}
+{-# complete PatClosedLambdaTermBruijnIndex, PatClosedLambdaTermApp, PatClosedLambdaTermLam #-}
 
 -- *** Builders
 
-mkLambdaTermBruijnIndex :: Int -> LambdaTerm
-mkLambdaTermBruijnIndex = PatLambdaTermBruijnIndex
+mkClosedLambdaTermBruijnIndex :: Int -> ClosedLambdaTerm
+mkClosedLambdaTermBruijnIndex = PatClosedLambdaTermBruijnIndex
 
-mkLambdaTermApp :: LambdaTerm -> LambdaTerm -> LambdaTerm
-mkLambdaTermApp = PatLambdaTermApp
+mkClosedLambdaTermApp :: ClosedLambdaTerm -> ClosedLambdaTerm -> ClosedLambdaTerm
+mkClosedLambdaTermApp = PatClosedLambdaTermApp
 
-mkLambdaTermLam :: LambdaTerm -> LambdaTerm
-mkLambdaTermLam = PatLambdaTermLam
+mkClosedLambdaTermLam :: ClosedLambdaTerm -> ClosedLambdaTerm
+mkClosedLambdaTermLam = PatClosedLambdaTermLam
 
 -- *** Helpers
 
 -- | Takes a set of for lambda term cases, takes a lambda term, detects term and applies according function to it:
-caseLambdaTerm
+caseClosedLambdaTerm
   :: (Int -> a)     -- ^ For index
-  -> (LambdaTerm -> LambdaTerm -> a) -- ^ For application
-  -> (LambdaTerm -> a)      -- ^ For function
-  -> LambdaTerm            -- ^ Term
+  -> (ClosedLambdaTerm -> ClosedLambdaTerm -> a) -- ^ For application
+  -> (ClosedLambdaTerm -> a)      -- ^ For function
+  -> ClosedLambdaTerm            -- ^ Term
   -> a             -- ^ Result
-caseLambdaTerm cf ca cl =
+caseClosedLambdaTerm cf ca cl =
  \case
-  PatLambdaTermBruijnIndex i -> cf   i
-  PatLambdaTermApp       f a -> ca f a
-  PatLambdaTermLam         b -> cl   b
+  PatClosedLambdaTermBruijnIndex i -> cf   i
+  PatClosedLambdaTermApp       f a -> ca f a
+  PatClosedLambdaTermLam         b -> cl   b
 
 -- *** Parser
 
-parserLambdaTerm :: Parser LambdaTerm
-parserLambdaTerm =
+parserClosedLambdaTerm :: Parser ClosedLambdaTerm
+parserClosedLambdaTerm =
   bruijnIndexParser <|>
   lambdaParser <|>
   appParser
  where
-  bruijnIndexParser :: Parser LambdaTerm
-   = mkLambdaTermBruijnIndex <$> decimal
-  lambdaParser :: Parser LambdaTerm
-   = mkLambdaTermLam <$> (string "\\ " *> bruijnIndexParser)
-  appParser :: Parser LambdaTerm
-   = mkLambdaTermApp <$> appFuncParser <*> appParamParser
+  bruijnIndexParser :: Parser ClosedLambdaTerm
+   = mkClosedLambdaTermBruijnIndex <$> decimal
+  lambdaParser :: Parser ClosedLambdaTerm
+   = mkClosedLambdaTermLam <$> (string "\\ " *> bruijnIndexParser)
+  appParser :: Parser ClosedLambdaTerm
+   = mkClosedLambdaTermApp <$> appFuncParser <*> appParamParser
    where
-    appFuncParser :: Parser LambdaTerm
-     = char '(' *> parserLambdaTerm <* char ')'
-    appParamParser :: Parser LambdaTerm
-     = char ' ' *> parserLambdaTerm
+    appFuncParser :: Parser ClosedLambdaTerm
+     = char '(' *> parserClosedLambdaTerm <* char ')'
+    appParamParser :: Parser ClosedLambdaTerm
+     = char ' ' *> parserClosedLambdaTerm
 
 -- *** Normal form
 
 -- | Normal form lambda term.
-newtype NLambdaTerm = NLambdaTerm LambdaTerm
+newtype NClosedLambdaTerm = NClosedLambdaTerm ClosedLambdaTerm
 
-normalize :: LambdaTerm -> NLambdaTerm
+normalize :: ClosedLambdaTerm -> NClosedLambdaTerm
 normalize = crc .
-  caseLambdaTerm
-    PatLambdaTermBruijnIndex
+  caseClosedLambdaTerm
+    PatClosedLambdaTermBruijnIndex
     forLambdaApplication
     forLambdaFunction
  where
-  forLambdaApplication :: LambdaTerm -> LambdaTerm -> LambdaTerm
   forLambdaApplication =
     flip betaReduce
 
-  forLambdaFunction :: LambdaTerm -> LambdaTerm
   forLambdaFunction =
-    PatLambdaTermLam . crc . normalize
+    PatClosedLambdaTermLam . crc . normalize
 
   -- | Lambda function application.
   -- Does beta-reduce when lambda term matches definition, otherwise does id.
   -- TODO: Try for this function to return Maybe.
   betaReduce
-    :: LambdaTerm -- ^ Argument to bind
-    -> LambdaTerm -- ^ Base expression to bind in
-    -> LambdaTerm -- ^ Expression with the bind applied
+    :: ClosedLambdaTerm -- ^ Argument to bind
+    -> ClosedLambdaTerm -- ^ Base expression to bind in
+    -> ClosedLambdaTerm -- ^ Expression with the bind applied
   betaReduce a =
     \case
-      (PatLambdaTermLam lb) -> substitute a 0 lb -- Apply value to this level binding
-      other -> PatLambdaTermApp other a
+      (PatClosedLambdaTermLam lb) -> substitute a 0 lb -- Apply value to this level binding
+      other -> PatClosedLambdaTermApp other a
    where
-    substitute :: LambdaTerm -> BruijnIndex -> LambdaTerm -> LambdaTerm
+    substitute :: ClosedLambdaTerm -> BruijnIndex -> ClosedLambdaTerm -> ClosedLambdaTerm
     substitute v bji =
-      caseLambdaTerm
+      caseClosedLambdaTerm
         searchIndexAndSubstituteOnMatch
         recurseIntoBothBranches
         recurseIntoFunction
@@ -218,13 +218,13 @@ normalize = crc .
       searchIndexAndSubstituteOnMatch =
         bool
           v  -- so substitution under index
-          . PatLambdaTermBruijnIndex -- do `id` ("pass")
+          . PatClosedLambdaTermBruijnIndex -- do `id` ("pass")
           <*> -- patthrough into both branches
             indexNotFound
        where
         indexNotFound = (crc bji /=)
       recurseIntoBothBranches =
-        on PatLambdaTermApp (substituteWithPermutatedIndex id)
+        on PatClosedLambdaTermApp (substituteWithPermutatedIndex id)
       -- | Outside Btuijn indexes increase +1 when enterning a scope of deeper function.
       --  2025-05-05: NOTE: This is considered costly compared to nameless encoding style. Since it increments/decrements all instances.
       recurseIntoFunction = substituteWithPermutatedIndex next
@@ -242,32 +242,32 @@ runOutputUnitTests =
 -- | Parses only lawful Bruijin lambda terms.
 runParserUnitTests :: IO ()
 runParserUnitTests =
-  traverse_ (parseTest parserLambdaTerm . (<> "\\n") . turnReadable) lambdaTermUnitTests
+  traverse_ (parseTest parserClosedLambdaTerm . (<> "\\n") . turnReadable) lambdaTermUnitTests
 
-lambdaTermUnitTests :: Seq LambdaTerm
+lambdaTermUnitTests :: Seq ClosedLambdaTerm
 lambdaTermUnitTests =
   (<>)
     (one mk0)
-    ((`mkLambdaTermApp` mk0) <$>
+    ((`mkClosedLambdaTermApp` mk0) <$>
       [ mk0
-      , PatLambdaTermLam mk0
-      , PatLambdaTermLam mk0
+      , PatClosedLambdaTermLam mk0
+      , PatClosedLambdaTermLam mk0
       ]
     )
 
-mk0 :: LambdaTerm
-mk0 = mkLambdaTermBruijnIndex 0
+mk0 :: ClosedLambdaTerm
+mk0 = mkClosedLambdaTermBruijnIndex 0
 
 -- | Parse the expression recieved.
 -- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
-parse' :: Text -> Either Text LambdaTerm
+parse' :: Text -> Either Text ClosedLambdaTerm
 parse' t =
   either
     (Left . fromString)
     pure
-    . parseOnly parserLambdaTerm $! (<> "\\n") t
+    . parseOnly parserClosedLambdaTerm $! (<> "\\n") t
 
-turnReadableThenParseBack :: LambdaTerm -> Either Text LambdaTerm
+turnReadableThenParseBack :: ClosedLambdaTerm -> Either Text ClosedLambdaTerm
 turnReadableThenParseBack = parse' . turnReadable
 
 -- *** REPL
@@ -358,7 +358,7 @@ optionSet = fullMap
   showExpr =
     parseThenApplyThenPrint id
 
-  parseThenApplyThenPrint :: (LambdaTerm -> LambdaTerm) -> Text -> Repl
+  parseThenApplyThenPrint :: (ClosedLambdaTerm -> ClosedLambdaTerm) -> Text -> Repl
   parseThenApplyThenPrint f =
     putTextLn . fromEither . ((turnReadable . f) <$>) . parse'
 
