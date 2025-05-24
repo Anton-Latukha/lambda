@@ -286,9 +286,10 @@ checkRoundtripParseReadable = crc $
 
 -- ** REPL
 
-type ReplF = R.HaskelineT IO
+newtype ReplF a = ReplF (R.HaskelineT IO a)
+ deriving (Functor, Applicative, Monad, MonadIO)
 
-type Repl = R.HaskelineT IO ()
+type Repl = ReplF ()
 
 newtype CommandName = CommandName Text
  deriving (Eq, Ord, IsString, ToString)
@@ -304,6 +305,9 @@ data Command = Command
     -- | Command function
     comm :: Text -> Repl
   }
+
+output :: Text -> ReplF ()
+output = putTextLn
 
 -- | Set of all options (+ multiline mode command), available inside REPL.
 optionSet :: Map CommandName Command
@@ -357,7 +361,7 @@ optionSet = fullMap
           (crc . docs)
           $ lookup (crc a) fullMap
     helpPreamble =
-      putTextLn . ("Help: " <>)
+      output . ("Help: " <>)
 
   cowsay :: Text -> Repl
   cowsay =
@@ -373,7 +377,7 @@ optionSet = fullMap
 
   parseThenApplyThenPrint :: (ClosedLambdaTerm -> ClosedLambdaTerm) -> Text -> Repl
   parseThenApplyThenPrint f =
-    putTextLn . fromEither . ((turnReadable . f) <$>) . parse'
+    output . fromEither . ((turnReadable . f) <$>) . parse'
 
 -- | Running the REPL
 main :: IO ()
@@ -383,14 +387,14 @@ main =
     runParserUnitTests
 
     R.evalRepl
-      banner
-      (evalPrint . fromString)
-      options
+      (crc . banner)
+      (crc . evalPrint . fromString)
+      (crc options)
       prefix
       multilineCommand
       completer
-      initialiser
-      finalizer
+      (crc initialiser)
+      (crc finalizer)
    where
     banner :: R.MultiLine -> ReplF String
     banner =
@@ -401,10 +405,10 @@ main =
 
     -- Evaluation : handle each line user inputs
     evalPrint :: Text -> Repl
-    evalPrint = putTextLn
+    evalPrint = output
 
     options :: R.Options ReplF =
-      formOptionREPLMap <$> toList optionSet
+      crc formOptionREPLMap <$> toList optionSet
      where
       formOptionREPLMap :: Command -> (String, String -> Repl)
       formOptionREPLMap c =
@@ -431,8 +435,8 @@ main =
 
     -- | What to do/print on entering REPL.
     initialiser :: Repl =
-      putStrLn "Simple Lamba calculus REPL. Enter \":help\" for information."
+      output "Simple Lamba calculus REPL. Enter \":help\" for information."
 
     -- | What to do/print on Ctrl+D (aka user making exit)
     finalizer :: ReplF R.ExitDecision =
-      putStrLn mempty $> R.Exit
+      output mempty $> R.Exit
