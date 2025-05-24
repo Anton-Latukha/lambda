@@ -275,14 +275,18 @@ parse' t =
 turnReadableThenParseBack :: ClosedLambdaTerm -> Either Text ClosedLambdaTerm
 turnReadableThenParseBack = parse' . turnReadable
 
-checkRoundtripParseReadable :: ClosedLambdaTerm -> Bool
-checkRoundtripParseReadable =
+newtype RoundTripSuccess = RoundTripSuccess Bool
+
+checkRoundtripParseReadable :: ClosedLambdaTerm -> RoundTripSuccess
+checkRoundtripParseReadable = crc $
   either
     (const False)
     . (==)
     <*> turnReadableThenParseBack
 
 -- ** REPL
+
+type ReplF = R.HaskelineT IO
 
 type Repl = R.HaskelineT IO ()
 
@@ -388,7 +392,7 @@ main =
       initialiser
       finalizer
    where
-    banner :: R.MultiLine -> R.HaskelineT IO String
+    banner :: R.MultiLine -> ReplF String
     banner =
       pure . bool
         mempty -- Multiline mode entry
@@ -399,7 +403,7 @@ main =
     evalPrint :: Text -> Repl
     evalPrint = putTextLn
 
-    options :: R.Options (R.HaskelineT IO) =
+    options :: R.Options ReplF =
       formOptionREPLMap <$> toList optionSet
      where
       formOptionREPLMap :: Command -> (String, String -> Repl)
@@ -430,5 +434,5 @@ main =
       putStrLn "Simple Lamba calculus REPL. Enter \":help\" for information."
 
     -- | What to do/print on Ctrl+D (aka user making exit)
-    finalizer :: R.HaskelineT IO R.ExitDecision =
+    finalizer :: ReplF R.ExitDecision =
       putStrLn mempty $> R.Exit
