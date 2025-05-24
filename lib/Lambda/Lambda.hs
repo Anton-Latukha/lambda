@@ -275,6 +275,13 @@ parse' t =
 turnReadableThenParseBack :: ClosedLambdaTerm -> Either Text ClosedLambdaTerm
 turnReadableThenParseBack = parse' . turnReadable
 
+checkRoundtripParseReadable :: ClosedLambdaTerm -> Bool
+checkRoundtripParseReadable =
+  either
+    (const False)
+    . (==)
+    <*> turnReadableThenParseBack
+
 -- ** REPL
 
 type Repl = R.HaskelineT IO ()
