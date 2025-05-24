@@ -422,11 +422,11 @@ lookupHM :: Hashable k => HashMap k v -> k -> Maybe v
 lookupHM = flip HM.lookup
 
 while :: (a -> Bool) -> (a -> a) -> a -> a
-while p f a =
+while p f = liftA3
   bool
-    a
-    (while p f (f a))
-    (p a)
+    id
+    (while p f . f)
+    p
 
 -- | Purely to fix type application code, and make the target type application first (imho the most useful case).
 -- @
