@@ -267,9 +267,8 @@ lambdaTermUnitTests =
 -- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
 parse' :: Text -> Either Text ClosedLambdaTerm
 parse' t =
-  either
-    (Left . fromString)
-    pure
+  mapLeft
+    fromString
     . parseOnly parserClosedLambdaTerm $! (<> "\\n") t
 
 turnReadableThenParseBack :: ClosedLambdaTerm -> Either Text ClosedLambdaTerm
@@ -320,7 +319,7 @@ optionSet = fullMap
   commandList :: [(CommandName, Command)] =
     [
       makeEntry "help"     "documentation on REPL commands"         help,
-      makeEntry "print"    "Echo what was put in"                   putTextLn,
+      makeEntry "print"    "Echo what was put in"                   output,
       makeEntry "showExpr" "Parse and print back lambda expression" showExpr,
       makeEntry "norm"     "Produce normal form"                    norm,
       makeEntry "cowsay"   ""                                       cowsay
