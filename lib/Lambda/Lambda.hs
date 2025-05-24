@@ -73,9 +73,9 @@ instance Eq1 ClosedLambdaTermF where
    where
     go (ClosedLambdaTermFLam           b1 ) (ClosedLambdaTermFLam           b2 ) =      crc go b1 b2
     go (ClosedLambdaTermFApp        f1 p1 ) (ClosedLambdaTermFApp        f2 p2 ) = (&&) (crc go f1 f2)
-                                                                           (crc go p1 p2)
+                                                                                       (crc go p1 p2)
     go (ClosedLambdaTermFBruijnIndex idx1 ) (ClosedLambdaTermFBruijnIndex idx2 ) = (==) idx1
-                                                                           idx2
+                                                                                       idx2
     go _ _ = False
 
 -- **** Finished ClosedLambdaTerm
