@@ -19,6 +19,8 @@ module Lambda.Utils
   , whenFalse
   , monoid
   , whenJust
+  , mapLeft
+  , mapRight
   , fromEither
   , isPresent
   , handlePresence
@@ -220,6 +222,20 @@ whenJust =
   maybe
     mempty
 {-# inline whenJust #-}
+
+-- | Modify Left flow.
+mapLeft :: (l -> a) -> Either l r -> Either a r
+mapLeft f =
+  either
+    (Left . f)
+    pure
+
+-- | Modify Right flow.
+mapRight :: (r -> a) -> Either l r -> Either l a
+mapRight f =
+  either
+    Left
+    (pure . f)
 
 -- | Strip @Either@ structure (needs same type brunches).
 fromEither :: Either c c -> c
