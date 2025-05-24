@@ -166,17 +166,20 @@ parserClosedLambdaTerm =
   lambdaParser <|>
   appParser
  where
-  bruijnIndexParser :: Parser ClosedLambdaTerm
-   = mkClosedLambdaTermBruijnIndex <$> decimal
-  lambdaParser :: Parser ClosedLambdaTerm
-   = mkClosedLambdaTermLam <$> (string "\\ " *> bruijnIndexParser)
-  appParser :: Parser ClosedLambdaTerm
-   = mkClosedLambdaTermApp <$> appFuncParser <*> appParamParser
+  bruijnIndexParser :: Parser ClosedLambdaTerm =
+    mkClosedLambdaTermBruijnIndex <$> decimal
+  lambdaParser :: Parser ClosedLambdaTerm =
+    mkClosedLambdaTermLam <$> (string "\\ " *> bruijnIndexParser)
+  appParser :: Parser ClosedLambdaTerm =
+    liftA2
+      mkClosedLambdaTermApp
+      appFuncParser
+      appParamParser
    where
-    appFuncParser :: Parser ClosedLambdaTerm
-     = char '(' *> parserClosedLambdaTerm <* char ')'
-    appParamParser :: Parser ClosedLambdaTerm
-     = char ' ' *> parserClosedLambdaTerm
+    appFuncParser :: Parser ClosedLambdaTerm =
+      char '(' *> parserClosedLambdaTerm <* char ')'
+    appParamParser :: Parser ClosedLambdaTerm =
+      char ' ' *> parserClosedLambdaTerm
 
 -- *** Normal form
 
@@ -244,19 +247,19 @@ runParserUnitTests :: IO ()
 runParserUnitTests =
   traverse_ (parseTest parserClosedLambdaTerm . (<> "\\n") . turnReadable) lambdaTermUnitTests
 
+mk0 :: ClosedLambdaTerm
+mk0 = mkClosedLambdaTermBruijnIndex 0
+
 lambdaTermUnitTests :: Seq ClosedLambdaTerm
 lambdaTermUnitTests =
   (<>)
     (one mk0)
-    ((`mkClosedLambdaTermApp` mk0) <$>
-      [ mk0
-      , PatClosedLambdaTermLam mk0
-      , PatClosedLambdaTermLam mk0
+    ((`mkClosedLambdaTermApp` mk0) . ($ mk0) <$>
+      [ id
+      , PatClosedLambdaTermLam
+      , PatClosedLambdaTermLam
       ]
     )
-
-mk0 :: ClosedLambdaTerm
-mk0 = mkClosedLambdaTermBruijnIndex 0
 
 -- | Parse the expression recieved.
 -- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
@@ -270,12 +273,9 @@ parse' t =
 turnReadableThenParseBack :: ClosedLambdaTerm -> Either Text ClosedLambdaTerm
 turnReadableThenParseBack = parse' . turnReadable
 
--- *** REPL
+-- ** REPL
 
 type Repl = R.HaskelineT IO ()
-
-command :: (Text -> Repl) -> (String -> Repl)
-command c = c . fromString
 
 newtype CommandName = CommandName Text
  deriving (Eq, Ord, IsString, ToString)
@@ -371,7 +371,7 @@ main =
 
     R.evalRepl
       banner
-      (command evalPrint)
+      (evalPrint . fromString)
       options
       prefix
       multilineCommand
