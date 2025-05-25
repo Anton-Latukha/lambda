@@ -8,6 +8,7 @@ module Lambda.Lambda
 -- ** Import
 
 import Lambda.Prelude
+import Lambda.ClosedTerm (Closed(..))
 import qualified Lambda.ClosedTerm as Closed
 import Relude.Extra.Map
 import qualified Data.Text as Text
@@ -30,14 +31,14 @@ runParserUnitTests =
     (Closed.parseWith parseTest . Closed.turnReadable)
     Closed.unitTests
 
-checkRoundtripParseReadable :: Closed.Term -> RoundTripSuccess
+checkRoundtripParseReadable :: Closed -> RoundTripSuccess
 checkRoundtripParseReadable = crc $
   either
     (const False)
     . (==)
     <*> Closed.turnReadableThenParseBack
 
-parseThenApplyThenPrint :: (Closed.Term -> Closed.Term) -> Text -> Repl
+parseThenApplyThenPrint :: (Closed -> Closed) -> Text -> Repl
 parseThenApplyThenPrint f =
   output . fromEither . ((Closed.turnReadable . f) <$>) . Closed.parse'
 

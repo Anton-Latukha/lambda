@@ -27,163 +27,163 @@ import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..)
 
 -- | If Lambda term has no free variables, it is called Closed.
 
-newtype TermF_AppFunc a = TermF_AppFunc (TermF a)
+newtype F_AppFunc a = F_AppFunc (F a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
-newtype TermF_AppParam a = TermF_AppParam (TermF a)
+newtype F_AppParam a = F_AppParam (F a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
-newtype TermF_LamBody a = TermF_LamBody (TermF a)
+newtype F_LamBody a = F_LamBody (F a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
 -- **** Functorial Lambda term/expression
 
-data TermF a
-  = TermF_BjIx !BjIx
-  | TermF_App    !(TermF_AppFunc a) !(TermF_AppParam a)
-  | TermF_Lam    !(TermF_LamBody a)
+data F a
+  = F_BjIx !BjIx
+  | F_App    !(F_AppFunc a) !(F_AppParam a)
+  | F_Lam    !(F_LamBody a)
  deriving (Eq, Show, Generic, Functor, Traversable, Foldable)
 
 -- ***** Instances
 
-instance Recursive (->) Term TermF where
-  cata :: Algebra (->) TermF a -> Term -> a
-  cata φ (Term (Mu f)) = f φ
+instance Recursive (->) Closed F where
+  cata :: Algebra (->) F a -> Closed -> a
+  cata φ (Closed (Mu f)) = f φ
 
-instance Projectable (->) Term TermF where
-  project :: Coalgebra (->) TermF Term
+instance Projectable (->) Closed F where
+  project :: Coalgebra (->) F Closed
   project = lambek
 
-instance Steppable (->) Term TermF where
-  embed :: Algebra (->) TermF Term
-  embed m = Term $ Mu $ \ f -> f $ fmap (cata f) m
+instance Steppable (->) Closed F where
+  embed :: Algebra (->) F Closed
+  embed m = Closed $ Mu $ \ f -> f $ fmap (cata f) m
 
-instance Eq1 TermF where
-  liftEq :: (a -> b -> Bool) -> TermF a -> TermF b -> Bool
+instance Eq1 F where
+  liftEq :: (a -> b -> Bool) -> F a -> F b -> Bool
   --  2025-05-20: FIXME: eq function `(a -> b -> Bool)` is ignored.
-  -- If there was Applicative to `TermF` the implementation then is `fold $ liftA2 eq a b`
+  -- If there was Applicative to `F` the implementation then is `fold $ liftA2 eq a b`
   liftEq _ = go  -- Making shure GHC detects that there is no point to go through typeclass dictionary searches, all other instances derive from here.
    where
-    go (TermF_Lam           b1 ) (TermF_Lam           b2 ) =      crc go b1 b2
-    go (TermF_App        f1 p1 ) (TermF_App        f2 p2 ) = (&&) (crc go f1 f2)
+    go (F_Lam           b1 ) (F_Lam           b2 ) =      crc go b1 b2
+    go (F_App        f1 p1 ) (F_App        f2 p2 ) = (&&) (crc go f1 f2)
                                                                                        (crc go p1 p2)
-    go (TermF_BjIx idx1 ) (TermF_BjIx idx2 ) = (==) idx1
+    go (F_BjIx idx1 ) (F_BjIx idx2 ) = (==) idx1
                                                                                        idx2
     go _ _ = False
 
--- **** Finished Term
+-- **** Finished term
 
-newtype Term = Term (Mu TermF)
+newtype Closed = Closed (Mu F)
  deriving (Eq, Generic)
 
 -- *** Isomorphism of lambda term to human readable representation
 
 -- | Abstraction for representation of human readable view of the closed lambda term datatype
-newtype TermBJHumanReadable = TermBJHumanReadable Term
+newtype ClosedBJHumanReadable = ClosedBJHumanReadable Closed
 
 -- **** Instances
 
-instance Show TermBJHumanReadable where
-  show :: TermBJHumanReadable -> String
+instance Show ClosedBJHumanReadable where
+  show :: ClosedBJHumanReadable -> String
   show = l_showHR . crc
    where
     -- | There is a newtype boundary between main lambda term data type and human readable, code prefers to preserve the general GHC derived @Show@ instances for the general case (showing term/expression internals) for the lambda term and its components, which is why this coersion enforsment is needed.
-    l_showHR :: Term -> String
+    l_showHR :: Closed -> String
     l_showHR =
-      caseTerm
+      caseClosed
         show
         showApp
         showLam
      where
-      showApp :: Term -> Term -> String
+      showApp :: Closed -> Closed -> String
       showApp f a = "(" <> l_showHR f <> ") " <> l_showHR a
-      showLam :: Term -> String
+      showLam :: Closed -> String
       showLam b = "\\ " <> l_showHR b
 
-instance Show Term where
-  show :: Term -> String
-  show (crc @TermBJHumanReadable -> a) = show a
+instance Show Closed where
+  show :: Closed -> String
+  show (crc @ClosedBJHumanReadable -> a) = show a
 
 -- **** Functions
 
-turnReadable :: Term -> Text
-turnReadable = show . TermBJHumanReadable
+turnReadable :: Closed -> Text
+turnReadable = show . ClosedBJHumanReadable
 
 -- *** Patterns
 
-pattern PatTerm_BjIx :: Int -> Term
-pattern PatTerm_BjIx n <- (project -> TermF_BjIx (BjIx n)) where
-        PatTerm_BjIx n =     embed (  TermF_BjIx (BjIx n))
+pattern Pat_BjIx :: Int -> Closed
+pattern Pat_BjIx n <- (project -> F_BjIx (BjIx n)) where
+        Pat_BjIx n =     embed (  F_BjIx (BjIx n))
 
-pattern PatTerm_App :: Term -> Term -> Term
-pattern PatTerm_App f a <- (project -> TermF_App (TermF_AppFunc (embed -> f)) (TermF_AppParam (embed -> a))) where
-        PatTerm_App f a =     embed (  TermF_App (TermF_AppFunc (project  f)) (TermF_AppParam (project  a)))
+pattern Pat_App :: Closed -> Closed -> Closed
+pattern Pat_App f a <- (project -> F_App (F_AppFunc (embed -> f)) (F_AppParam (embed -> a))) where
+        Pat_App f a =     embed (  F_App (F_AppFunc (project  f)) (F_AppParam (project  a)))
 
-pattern PatTerm_Lam :: Term -> Term
-pattern PatTerm_Lam b <- (project -> TermF_Lam (TermF_LamBody (embed -> b))) where
-        PatTerm_Lam b =     embed (  TermF_Lam (TermF_LamBody (project  b)))
+pattern Pat_Lam :: Closed -> Closed
+pattern Pat_Lam b <- (project -> F_Lam (F_LamBody (embed -> b))) where
+        Pat_Lam b =     embed (  F_Lam (F_LamBody (project  b)))
 
-{-# complete PatTerm_BjIx, PatTerm_App, PatTerm_Lam #-}
+{-# complete Pat_BjIx, Pat_App, Pat_Lam #-}
 
 -- *** Builders
 
-mkTermBjIx :: Int -> Term
-mkTermBjIx = PatTerm_BjIx
+mkBjIx :: Int -> Closed
+mkBjIx = Pat_BjIx
 
-mkTermApp :: Term -> Term -> Term
-mkTermApp = PatTerm_App
+mkApp :: Closed -> Closed -> Closed
+mkApp = Pat_App
 
-mkTermLam :: Term -> Term
-mkTermLam = PatTerm_Lam
+mkLam :: Closed -> Closed
+mkLam = Pat_Lam
 
 -- *** Helpers
 
 -- | Takes a set of for lambda term cases, takes a lambda term, detects term and applies according function to it:
-caseTerm
+caseClosed
   :: (Int -> a)     -- ^ For index
-  -> (Term -> Term -> a) -- ^ For application
-  -> (Term -> a)      -- ^ For function
-  -> Term            -- ^ Term
+  -> (Closed -> Closed -> a) -- ^ For application
+  -> (Closed -> a)      -- ^ For function
+  -> Closed            -- ^ ClosedTerm
   -> a             -- ^ Result
-caseTerm cf ca cl =
+caseClosed cf ca cl =
  \case
-  PatTerm_BjIx i -> cf   i
-  PatTerm_App       f a -> ca f a
-  PatTerm_Lam         b -> cl   b
+  Pat_BjIx i -> cf   i
+  Pat_App       f a -> ca f a
+  Pat_Lam         b -> cl   b
 
 -- *** Parser
 
-parserTerm :: Parser Term
-parserTerm =
-  bjIxParser <|>
-  fnParser <|>
-  appParser
+parserClosed :: Parser Closed
+parserClosed =
+  bjIx <|>
+  fn <|>
+  app
  where
-  bjIxParser :: Parser Term =
-    mkTermBjIx <$> decimal
-  fnParser :: Parser Term =
-    mkTermLam <$> (string "\\ " *> bjIxParser)
-  appParser :: Parser Term =
+  bjIx :: Parser Closed =
+    mkBjIx <$> decimal
+  fn :: Parser Closed =
+    mkLam <$> (string "\\ " *> bjIx)
+  app :: Parser Closed =
     liftA2
-      mkTermApp
-      appFuncParser
-      appParamParser
+      mkApp
+      appFn
+      appPar
    where
-    appFuncParser :: Parser Term =
-      between '(' ')' parserTerm
-    appParamParser :: Parser Term =
-      char ' ' *> parserTerm
+    appFn :: Parser Closed =
+      between '(' ')' parserClosed
+    appPar :: Parser Closed =
+      char ' ' *> parserClosed
     between bra ket p = char bra *> p <* char ket
 
 -- *** Normal form
 
 -- | Normal form lambda term.
-newtype NTerm = NTerm Term
+newtype NClosed = NClosed Closed
 
-normalize :: Term -> NTerm
+normalize :: Closed -> NClosed
 normalize = crc .
-  caseTerm
-    PatTerm_BjIx
+  caseClosed
+    Pat_BjIx
     forApplication
     forFn
  where
@@ -191,23 +191,23 @@ normalize = crc .
     flip betaReduce
 
   forFn =
-    PatTerm_Lam . crc . normalize
+    Pat_Lam . crc . normalize
 
   -- | Lambda function application.
   -- Does beta-reduce when lambda term matches definition, otherwise does id.
   -- TODO: Try for this function to return Maybe.
   betaReduce
-    :: Term -- ^ Argument to bind
-    -> Term -- ^ Base expression to bind in
-    -> Term -- ^ Expression with the bind applied
+    :: Closed -- ^ Argument to bind
+    -> Closed -- ^ Base expression to bind in
+    -> Closed -- ^ Expression with the bind applied
   betaReduce a =
     \case
-      (PatTerm_Lam lb) -> substitute a 0 lb -- Apply value to this level binding
-      other -> PatTerm_App other a
+      (Pat_Lam lb) -> substitute a 0 lb -- Apply value to this level binding
+      other -> Pat_App other a
    where
-    substitute :: Term -> BjIx -> Term -> Term
+    substitute :: Closed -> BjIx -> Closed -> Closed
     substitute v bji =
-      caseTerm
+      caseClosed
         searchIndexAndSubstituteOnMatch
         recurseIntoBothBranches
         recurseIntoFunction
@@ -215,13 +215,13 @@ normalize = crc .
       searchIndexAndSubstituteOnMatch =
         bool
           v  -- so substitution under index
-          . PatTerm_BjIx -- do `id` ("pass")
+          . Pat_BjIx -- do `id` ("pass")
           <*> -- patthrough into both branches
             indexNotFound
        where
         indexNotFound = (crc bji /=)
       recurseIntoBothBranches =
-        on PatTerm_App (substituteWithPermutatedIndex id)
+        on Pat_App (substituteWithPermutatedIndex id)
       -- | Outside Btuijn indexes increase +1 when enterning a scope of deeper function.
       --  2025-05-05: NOTE: This is considered costly compared to nameless encoding style. Since it increments/decrements all instances.
       recurseIntoFunction = substituteWithPermutatedIndex next
@@ -229,32 +229,32 @@ normalize = crc .
 
 -- *** Testing
 
-mk0 :: Term
-mk0 = mkTermBjIx 0
+mk0 :: Closed
+mk0 = mkBjIx 0
 
-unitTests :: Seq Term
+unitTests :: Seq Closed
 unitTests =
   cons
     mk0
-    $ (`mkTermApp` mk0) . ($ mk0) <$>
+    $ (`mkApp` mk0) . ($ mk0) <$>
       [ id
-      , PatTerm_Lam
-      , PatTerm_Lam
+      , Pat_Lam
+      , Pat_Lam
       ]
 
 -- | Parse the expression recieved.
 -- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
-parse' :: Text -> Either Text Term
+parse' :: Text -> Either Text Closed
 parse' =
   mapLeft
     fromString
     . parseWith parseOnly
 
--- | Internalizes Term parser, takes utility parser function of parser, and takes Text into it to parse.
-parseWith :: (Parser Term -> Text -> b) -> Text -> b
+-- | Internalizes Closed parser, takes utility parser function of parser, and takes Text into it to parse.
+parseWith :: (Parser Closed -> Text -> b) -> Text -> b
 parseWith f =
-  f parserTerm . (<> "\\n")
+  f parserClosed . (<> "\\n")
 
-turnReadableThenParseBack :: Term -> Either Text Term
+turnReadableThenParseBack :: Closed -> Either Text Closed
 turnReadableThenParseBack = parse' . turnReadable
 
