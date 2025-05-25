@@ -245,7 +245,9 @@ runOutputUnitTests =
 -- | Parses only lawful Bruijin lambda terms.
 runParserUnitTests :: IO ()
 runParserUnitTests =
-  traverse_ (parseTest parserClosedLambdaTerm . (<> "\\n") . turnReadable) lambdaTermUnitTests
+  traverse_
+    (parseClosedLambdaTermWith parseTest . turnReadable)
+    lambdaTermUnitTests
 
 mk0 :: ClosedLambdaTerm
 mk0 = mkClosedLambdaTermBruijnIndex 0
@@ -263,10 +265,15 @@ lambdaTermUnitTests =
 -- | Parse the expression recieved.
 -- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
 parse' :: Text -> Either Text ClosedLambdaTerm
-parse' t =
+parse' =
   mapLeft
     fromString
-    . parseOnly parserClosedLambdaTerm $! (<> "\\n") t
+    . parseClosedLambdaTermWith parseOnly
+
+-- | Internalizes ClosedLambdaTerm parser, takes utility parser function of parser, and takes Text into it to parse.
+parseClosedLambdaTermWith :: (Parser ClosedLambdaTerm -> Text -> b) -> Text -> b
+parseClosedLambdaTermWith f =
+  f parserClosedLambdaTerm . (<> "\\n")
 
 turnReadableThenParseBack :: ClosedLambdaTerm -> Either Text ClosedLambdaTerm
 turnReadableThenParseBack = parse' . turnReadable
@@ -380,13 +387,13 @@ optionSet = fullMap
 main :: IO ()
 main =
   do
-    putTextLn "Running Output Unit Tests"
+    putTextLn "\nRunning Output Unit Tests ..."
     runOutputUnitTests
 
-    putTextLn "Running Parser Unit Tests"
+    putTextLn "\nRunning Parser Unit Tests ..."
     runParserUnitTests
 
-    putTextLn "Running Roundtrip Unit Tests"
+    putTextLn "\nRunning Roundtrip Unit Tests ..."
     putTextLn $ show allTermUnitTestsRoundtrip
 
     R.evalRepl
@@ -446,3 +453,5 @@ main =
 
     allTermUnitTestsRoundtrip :: RoundTripSuccess
     allTermUnitTestsRoundtrip = crc $ foldr ((&&) . crc checkRoundtripParseReadable) True lambdaTermUnitTests
+
+-- ** Open Lambda calculus term
