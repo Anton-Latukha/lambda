@@ -135,10 +135,8 @@ optionSet = fullMap
     cowsay =
       liftIO . callCommand . toString . ("cowsay " <>)
 
-
 newtype RoundTripSuccess = RoundTripSuccess Bool
  deriving (Show)
-
 
 -- | Running the REPL
 main :: IO ()
@@ -152,6 +150,7 @@ main =
 
     putTextLn "\nRunning Roundtrip Unit Tests ..."
     putTextLn $ show allTermUnitTestsRoundtrip
+    putTextLn "\n"
 
     R.evalRepl
       (crc . banner)
@@ -178,7 +177,7 @@ main =
     evalPrint = output
 
     options :: R.Options ReplF =
-      crc formOptionREPLMap <$> toList optionSet
+      formOptionREPLMap <$> toList optionSet
      where
       formOptionREPLMap :: Command -> (String, String -> Repl)
       formOptionREPLMap c =

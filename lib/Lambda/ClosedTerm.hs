@@ -34,7 +34,7 @@ newtype F_AppParam a = F_AppParam (F a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
 newtype F_LamBody a = F_LamBody (F a)
- deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable, Applicative)
+ deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
 -- **** Functorial Lambda term/expression
 
