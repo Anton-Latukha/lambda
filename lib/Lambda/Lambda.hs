@@ -177,9 +177,10 @@ parserClosedLambdaTerm =
       appParamParser
    where
     appFuncParser :: Parser ClosedLambdaTerm =
-      char '(' *> parserClosedLambdaTerm <* char ')'
+      between '(' ')' parserClosedLambdaTerm
     appParamParser :: Parser ClosedLambdaTerm =
       char ' ' *> parserClosedLambdaTerm
+    between bra ket p = char bra *> p <* char ket
 
 -- *** Normal form
 
