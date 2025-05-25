@@ -252,16 +252,13 @@ mk0 = mkClosedLambdaTermBruijnIndex 0
 
 lambdaTermUnitTests :: Seq ClosedLambdaTerm
 lambdaTermUnitTests =
-  liftA2 (<>)
-    one
-    (\ k -> fmap
-      (flip (mkClosedLambdaTermApp =<<) k)
+  cons
+    mk0
+    $ (`mkClosedLambdaTermApp` mk0) . ($ mk0) <$>
       [ id
       , PatClosedLambdaTermLam
       , PatClosedLambdaTermLam
       ]
-    )
-    mk0
 
 -- | Parse the expression recieved.
 -- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
