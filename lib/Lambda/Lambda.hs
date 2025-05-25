@@ -272,6 +272,7 @@ turnReadableThenParseBack :: ClosedLambdaTerm -> Either Text ClosedLambdaTerm
 turnReadableThenParseBack = parse' . turnReadable
 
 newtype RoundTripSuccess = RoundTripSuccess Bool
+ deriving (Show)
 
 checkRoundtripParseReadable :: ClosedLambdaTerm -> RoundTripSuccess
 checkRoundtripParseReadable = crc $
@@ -442,3 +443,6 @@ main =
     -- | What to do/print on Ctrl+D (aka user making exit)
     finalizer :: ReplF R.ExitDecision =
       output mempty $> R.Exit
+
+    allTermUnitTestsRoundtrip :: RoundTripSuccess
+    allTermUnitTestsRoundtrip = crc $ foldr ((&&) . crc checkRoundtripParseReadable) True lambdaTermUnitTests
