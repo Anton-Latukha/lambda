@@ -38,8 +38,8 @@ checkRoundtripParseReadable = crc $
     . (==)
     <*> Closed.turnReadableThenParseBack
 
-parseThenApplyThenPrint :: (Closed -> Closed) -> Text -> Repl
-parseThenApplyThenPrint f =
+parseApplyPrint :: (Closed -> Closed) -> Text -> Repl
+parseApplyPrint f =
   output . fromEither . ((Closed.turnReadable . f) <$>) . Closed.parse'
 
 -- ** REPL
@@ -73,65 +73,68 @@ optionSet = fullMap
  where
   -- | It is internalized to have optimized internal recursive search to produce `:help` output
   fullMap :: Map CommandName Command =
-    fromList commandList
-
-  commandList :: [(CommandName, Command)] =
-    [
-      makeEntry "help"     "documentation on REPL commands"         help,
-      makeEntry "print"    "Echo what was put in"                   output,
-      makeEntry "showExpr" "Parse and print back lambda expression" showExpr,
-      makeEntry "norm"     "Produce normal form"                    norm,
-      makeEntry "cowsay"   ""                                       cowsay
-    ]
-  makeEntry :: CommandName -> Text -> (Text -> Repl) -> (CommandName, Command)
-  makeEntry n d f = (n, cmd)
+    fromList $ makeEntry <$> commandList
    where
-    cmd =
-      Command {
-        name = n,
-        docs = commandDocBuilder n d,
-        comm = f
-      }
+    commandList :: [(CommandName, Text, Text -> Repl)] =
+      [
+        ("help"     ,"documentation on REPL commands"        ,help      ),
+        ("print"    ,"Echo what was put in"                  ,output    ),
+        ("showExpr" ,"Parse and print back lambda expression",showTerm  ),
+        ("norm"     ,"Produce normal form"                   ,normalForm),
+        ("cowsay"   ,""                                      ,cowsay    )
+      ]
+    makeEntry :: (CommandName, Text, Text -> Repl) -> (CommandName, Command)
+    makeEntry (n, d, f) = (n, cmd)
+      where
+      cmd =
+        Command {
+          name = n,
+          docs = mkCommandDoc,
+          comm = f
+        }
+       where
+        -- | Doc builder
+        mkCommandDoc:: CommandDocs
+        mkCommandDoc= crc $ "\n\n>:" <> name <> "\n\nNAME\n\t" <> name <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> name <> " [command]\n\nDESCRIPTION\n\t" <> name <> ""
+         where
+          name = crc n
 
-  -- | Doc builder
-  commandDocBuilder :: CommandName -> Text -> CommandDocs
-  commandDocBuilder (crc -> c) d = crc $ "\n\n>:" <> c <> "\n\nNAME\n\t" <> c <> " - " <> d <> "\n\nSYNOPSIS\n\t" <> c <> " [command]\n\nDESCRIPTION\n\t" <> c <> ""
-
-  help :: Text -> Repl
-  help =
-    whenText
-      outputWhenNoArgument
-      outputWhenParticularCommand
-   where
-    outputWhenNoArgument :: Repl =
-      helpPreamble $ Text.concat $ crc allDocs
+    help :: Text -> Repl
+    help =
+      whenText
+        helpNoArgument
+        helpForCommand
      where
-      allDocs :: [CommandDocs] =
-        docs . snd <$> commandList
-    outputWhenParticularCommand :: Text -> Repl
-    outputWhenParticularCommand =
-      helpPreamble . outputParticularCommand
-     where
-      outputParticularCommand :: Text -> Text
-      outputParticularCommand a =
-        maybe
-          ("The '" <> a <> "' not found and not supported, check the simple `:help` for all supported commands.")
-          (crc . docs)
-          $ lookup (crc a) fullMap
-    helpPreamble =
-      output . ("Help: " <>)
+      helpNoArgument :: Repl =
+        helpPreamble $ Text.concat $ crc allDocs
+       where
+        allDocs :: [CommandDocs] =
+          (\ (_,docs,_) -> crc docs) <$> commandList
+      helpForCommand :: Text -> Repl
+      helpForCommand =
+        helpPreamble . helpParticularCommand
+       where
+        helpParticularCommand :: Text -> Text
+        helpParticularCommand a =
+          maybe
+            ("The '" <> a <> "' not found and not supported, check the simple `:help` for all supported commands.")
+            (crc . docs)
+            $ lookup (crc a) fullMap
+      helpPreamble =
+        output . ("Help: " <>)
 
-  cowsay :: Text -> Repl
-  cowsay =
-    liftIO . callCommand . toString . ("cowsay " <>)
+    showTerm :: Text -> Repl
+    showTerm =
+      parseApplyPrint id
 
-  norm :: Text -> Repl
-  norm =
-    parseThenApplyThenPrint (crc . Closed.normalize)
+    normalForm :: Text -> Repl
+    normalForm =
+      parseApplyPrint (crc . Closed.normalize)
 
-  showExpr :: Text -> Repl
-  showExpr =
-    parseThenApplyThenPrint id
+    cowsay :: Text -> Repl
+    cowsay =
+      liftIO . callCommand . toString . ("cowsay " <>)
+
 
 newtype RoundTripSuccess = RoundTripSuccess Bool
  deriving (Show)
@@ -160,6 +163,9 @@ main =
       (crc initialiser)
       (crc finalizer)
    where
+    allTermUnitTestsRoundtrip :: RoundTripSuccess
+    allTermUnitTestsRoundtrip = crc $ foldr ((&&) . crc checkRoundtripParseReadable) True Closed.unitTests
+
     banner :: R.MultiLine -> ReplF String
     banner =
       pure . bool
@@ -204,8 +210,5 @@ main =
     -- | What to do/print on Ctrl+D (aka user making exit)
     finalizer :: ReplF R.ExitDecision =
       output mempty $> R.Exit
-
-    allTermUnitTestsRoundtrip :: RoundTripSuccess
-    allTermUnitTestsRoundtrip = crc $ foldr ((&&) . crc checkRoundtripParseReadable) True Closed.unitTests
 
 -- ** Open Lambda calculus term
