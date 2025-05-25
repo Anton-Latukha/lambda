@@ -11,5 +11,5 @@ import Lambda.Prelude
 -- | Bruijn index in lambda term.
 -- Index < number of external lambda binds => index == binded lambda value
 -- Index >= number of external lambda binds => index == free variable
-newtype BruijnIndex = BruijnIndex Int
+newtype BjIx = BjIx Int
  deriving (Eq, Enum, Num, Bounded, Show, Generic)

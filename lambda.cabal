@@ -46,20 +46,6 @@ common shared
     -- , filepath
     , relude
 
-    --  2025-05-02: NOTE: Imports for module "Utils":
-    , binary
-    , serialise
-    , free
-    , monad-control
-    , aeson
-    , data-fix
-    , lens-family
-    , filepath
-
-    --  2025-05-11: NOTE: Imports for REPL executable
-    , repline
-    , process
-
     -- , template-haskell
     -- , time
     -- , tasty
@@ -104,6 +90,20 @@ library
   hs-source-dirs:
     lib
   build-depends:
+    --  2025-05-02: NOTE: Imports for module "Utils":
+    , binary
+    , serialise
+    , free
+    , monad-control
+    , aeson
+    , data-fix
+    , lens-family
+    , filepath
+
+    --  2025-05-11: NOTE: Imports for REPL executable
+    , repline
+    , process
+
     -- 2025-05-02: NOTE: imports for "Lambda.Lambda"
     , yaya
     , attoparsec

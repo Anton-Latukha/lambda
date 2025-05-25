@@ -37,7 +37,7 @@ newtype TermFLamBody a = TermFLamBody (TermF a)
 -- **** Functorial Lambda term/expression
 
 data TermF a
-  = TermFBruijnIndex !BruijnIndex
+  = TermFBruijnIndex !BjIx
   | TermFApp    !(TermFAppFunc a) !(TermFAppParam a)
   | TermFLam    !(TermFLamBody a)
  deriving (Eq, Show, Generic, Functor, Traversable, Foldable)
@@ -110,8 +110,8 @@ turnReadable = show . TermBJHumanReadable
 -- *** Patterns
 
 pattern PatTermBruijnIndex :: Int -> Term
-pattern PatTermBruijnIndex n <- (project -> TermFBruijnIndex (BruijnIndex n)) where
-        PatTermBruijnIndex n =     embed (  TermFBruijnIndex (BruijnIndex n))
+pattern PatTermBruijnIndex n <- (project -> TermFBruijnIndex (BjIx n)) where
+        PatTermBruijnIndex n =     embed (  TermFBruijnIndex (BjIx n))
 
 pattern PatTermApp :: Term -> Term -> Term
 pattern PatTermApp f a <- (project -> TermFApp (TermFAppFunc (embed -> f)) (TermFAppParam (embed -> a))) where
@@ -203,7 +203,7 @@ normalize = crc .
       (PatTermLam lb) -> substitute a 0 lb -- Apply value to this level binding
       other -> PatTermApp other a
    where
-    substitute :: Term -> BruijnIndex -> Term -> Term
+    substitute :: Term -> BjIx -> Term -> Term
     substitute v bji =
       caseTerm
         searchIndexAndSubstituteOnMatch
