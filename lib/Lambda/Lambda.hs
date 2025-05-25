@@ -379,8 +379,14 @@ optionSet = fullMap
 main :: IO ()
 main =
   do
+    putTextLn "Running Output Unit Tests"
     runOutputUnitTests
+
+    putTextLn "Running Parser Unit Tests"
     runParserUnitTests
+
+    putTextLn "Running Roundtrip Unit Tests"
+    putTextLn $ show allTermUnitTestsRoundtrip
 
     R.evalRepl
       (crc . banner)
