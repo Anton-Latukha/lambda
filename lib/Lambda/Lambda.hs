@@ -15,18 +15,6 @@ import Data.Attoparsec.Text ( parseTest )
 import qualified System.Console.Repline as R
 import System.Process (callCommand)
 
--- ** Lambda calculi
-
--- *** Initial type primitive boundaries
-
--- **** New type typisation for closed Lambda term
-
--- | If Lambda term has no free variables, it is called Closed.
-
-
-
-
-
 -- *** Testing
 
 runOutputUnitTests :: IO ()
