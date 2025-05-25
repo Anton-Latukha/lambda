@@ -4,11 +4,11 @@
 -- "Prelude" module has a problem of being imported & used by other projects.
 -- "Lambda.Utils" as a module with a regular name does not have that problem.
 module Lambda.Prelude
-    ( module Lambda.Utils
+    ( module Lambda.Util
     , module Relude
     ) where
 
-import           Lambda.Utils
+import           Lambda.Util
 import           Relude                  hiding ( pass
                                                 , force
                                                 , readFile

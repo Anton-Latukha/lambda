@@ -90,8 +90,10 @@ common shared
 library
   import: shared
   exposed-modules:
-    Lambda.Utils
+    Lambda.Util
     Lambda.Prelude
+    Lambda.Atom
+    Lambda.ClosedTerm
     Lambda.Lambda
     -- Lambda.LNR
 

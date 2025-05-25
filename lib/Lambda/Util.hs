@@ -3,7 +3,7 @@
 -- | This is a module of custom "Prelude" code.
 -- It is for import for projects other then @Hisp@.
 -- For @Hisp@ - this module gets reexported by "Prelude", so for @Hisp@ please fix-up pass-through there.
-module Lambda.Utils
+module Lambda.Util
   ( stub
   , pass
   , dup
