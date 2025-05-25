@@ -27,20 +27,20 @@ import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..)
 
 -- | If Lambda term has no free variables, it is called Closed.
 
-newtype F_AppFunc a = F_AppFunc (F a)
+newtype F_AppTarget a = F_AppTarget (F a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
 newtype F_AppParam a = F_AppParam (F a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
 newtype F_LamBody a = F_LamBody (F a)
- deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
+ deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable, Applicative)
 
 -- **** Functorial Lambda term/expression
 
 data F a
   = F_BjIx !BjIx
-  | F_App    !(F_AppFunc a) !(F_AppParam a)
+  | F_App    !(F_AppTarget a) !(F_AppParam a)
   | F_Lam    !(F_LamBody a)
  deriving (Eq, Show, Generic, Functor, Traversable, Foldable)
 
@@ -66,9 +66,9 @@ instance Eq1 F where
    where
     go (F_Lam           b1 ) (F_Lam           b2 ) =      crc go b1 b2
     go (F_App        f1 p1 ) (F_App        f2 p2 ) = (&&) (crc go f1 f2)
-                                                                                       (crc go p1 p2)
+                                                         (crc go p1 p2)
     go (F_BjIx idx1 ) (F_BjIx idx2 ) = (==) idx1
-                                                                                       idx2
+                                           idx2
     go _ _ = False
 
 -- **** Finished term
@@ -116,8 +116,8 @@ pattern Pat_BjIx n <- (project -> F_BjIx (BjIx n)) where
         Pat_BjIx n =     embed (  F_BjIx (BjIx n))
 
 pattern Pat_App :: Closed -> Closed -> Closed
-pattern Pat_App f a <- (project -> F_App (F_AppFunc (embed -> f)) (F_AppParam (embed -> a))) where
-        Pat_App f a =     embed (  F_App (F_AppFunc (project  f)) (F_AppParam (project  a)))
+pattern Pat_App f a <- (project -> F_App (F_AppTarget (embed -> f)) (F_AppParam (embed -> a))) where
+        Pat_App f a =     embed (  F_App (F_AppTarget (project  f)) (F_AppParam (project  a)))
 
 pattern Pat_Lam :: Closed -> Closed
 pattern Pat_Lam b <- (project -> F_Lam (F_LamBody (embed -> b))) where
