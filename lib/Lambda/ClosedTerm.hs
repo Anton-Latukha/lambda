@@ -1,6 +1,8 @@
 {-# language PatternSynonyms #-}
 {-# language PartialTypeSignatures #-}
 {-# language StrictData #-}
+{-# options_GHC -Wno-unrecognised-pragmas #-}
+{-# hlint ignore "Use camelCase" #-}
 
 -- | The context of this module is closed lambda terms only (aka: lawful lambda term that has no free variables)
 module Lambda.ClosedTerm
@@ -25,21 +27,21 @@ import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..)
 
 -- | If Lambda term has no free variables, it is called Closed.
 
-newtype TermFAppFunc a = TermFAppFunc (TermF a)
+newtype TermF_AppFunc a = TermF_AppFunc (TermF a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
-newtype TermFAppParam a = TermFAppParam (TermF a)
+newtype TermF_AppParam a = TermF_AppParam (TermF a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
-newtype TermFLamBody a = TermFLamBody (TermF a)
+newtype TermF_LamBody a = TermF_LamBody (TermF a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
 -- **** Functorial Lambda term/expression
 
 data TermF a
-  = TermFBruijnIndex !BjIx
-  | TermFApp    !(TermFAppFunc a) !(TermFAppParam a)
-  | TermFLam    !(TermFLamBody a)
+  = TermF_BjIx !BjIx
+  | TermF_App    !(TermF_AppFunc a) !(TermF_AppParam a)
+  | TermF_Lam    !(TermF_LamBody a)
  deriving (Eq, Show, Generic, Functor, Traversable, Foldable)
 
 -- ***** Instances
@@ -62,10 +64,10 @@ instance Eq1 TermF where
   -- If there was Applicative to `TermF` the implementation then is `fold $ liftA2 eq a b`
   liftEq _ = go  -- Making shure GHC detects that there is no point to go through typeclass dictionary searches, all other instances derive from here.
    where
-    go (TermFLam           b1 ) (TermFLam           b2 ) =      crc go b1 b2
-    go (TermFApp        f1 p1 ) (TermFApp        f2 p2 ) = (&&) (crc go f1 f2)
+    go (TermF_Lam           b1 ) (TermF_Lam           b2 ) =      crc go b1 b2
+    go (TermF_App        f1 p1 ) (TermF_App        f2 p2 ) = (&&) (crc go f1 f2)
                                                                                        (crc go p1 p2)
-    go (TermFBruijnIndex idx1 ) (TermFBruijnIndex idx2 ) = (==) idx1
+    go (TermF_BjIx idx1 ) (TermF_BjIx idx2 ) = (==) idx1
                                                                                        idx2
     go _ _ = False
 
@@ -109,30 +111,30 @@ turnReadable = show . TermBJHumanReadable
 
 -- *** Patterns
 
-pattern PatTermBruijnIndex :: Int -> Term
-pattern PatTermBruijnIndex n <- (project -> TermFBruijnIndex (BjIx n)) where
-        PatTermBruijnIndex n =     embed (  TermFBruijnIndex (BjIx n))
+pattern PatTerm_BjIx :: Int -> Term
+pattern PatTerm_BjIx n <- (project -> TermF_BjIx (BjIx n)) where
+        PatTerm_BjIx n =     embed (  TermF_BjIx (BjIx n))
 
-pattern PatTermApp :: Term -> Term -> Term
-pattern PatTermApp f a <- (project -> TermFApp (TermFAppFunc (embed -> f)) (TermFAppParam (embed -> a))) where
-        PatTermApp f a =     embed (  TermFApp (TermFAppFunc (project  f)) (TermFAppParam (project  a)))
+pattern PatTerm_App :: Term -> Term -> Term
+pattern PatTerm_App f a <- (project -> TermF_App (TermF_AppFunc (embed -> f)) (TermF_AppParam (embed -> a))) where
+        PatTerm_App f a =     embed (  TermF_App (TermF_AppFunc (project  f)) (TermF_AppParam (project  a)))
 
-pattern PatTermLam :: Term -> Term
-pattern PatTermLam b <- (project -> TermFLam (TermFLamBody (embed -> b))) where
-        PatTermLam b =     embed (  TermFLam (TermFLamBody (project  b)))
+pattern PatTerm_Lam :: Term -> Term
+pattern PatTerm_Lam b <- (project -> TermF_Lam (TermF_LamBody (embed -> b))) where
+        PatTerm_Lam b =     embed (  TermF_Lam (TermF_LamBody (project  b)))
 
-{-# complete PatTermBruijnIndex, PatTermApp, PatTermLam #-}
+{-# complete PatTerm_BjIx, PatTerm_App, PatTerm_Lam #-}
 
 -- *** Builders
 
-mkTermBruijnIndex :: Int -> Term
-mkTermBruijnIndex = PatTermBruijnIndex
+mkTermBjIx :: Int -> Term
+mkTermBjIx = PatTerm_BjIx
 
 mkTermApp :: Term -> Term -> Term
-mkTermApp = PatTermApp
+mkTermApp = PatTerm_App
 
 mkTermLam :: Term -> Term
-mkTermLam = PatTermLam
+mkTermLam = PatTerm_Lam
 
 -- *** Helpers
 
@@ -145,22 +147,22 @@ caseTerm
   -> a             -- ^ Result
 caseTerm cf ca cl =
  \case
-  PatTermBruijnIndex i -> cf   i
-  PatTermApp       f a -> ca f a
-  PatTermLam         b -> cl   b
+  PatTerm_BjIx i -> cf   i
+  PatTerm_App       f a -> ca f a
+  PatTerm_Lam         b -> cl   b
 
 -- *** Parser
 
 parserTerm :: Parser Term
 parserTerm =
-  bruijnIndexParser <|>
-  lambdaParser <|>
+  bjIxParser <|>
+  fnParser <|>
   appParser
  where
-  bruijnIndexParser :: Parser Term =
-    mkTermBruijnIndex <$> decimal
-  lambdaParser :: Parser Term =
-    mkTermLam <$> (string "\\ " *> bruijnIndexParser)
+  bjIxParser :: Parser Term =
+    mkTermBjIx <$> decimal
+  fnParser :: Parser Term =
+    mkTermLam <$> (string "\\ " *> bjIxParser)
   appParser :: Parser Term =
     liftA2
       mkTermApp
@@ -181,15 +183,15 @@ newtype NTerm = NTerm Term
 normalize :: Term -> NTerm
 normalize = crc .
   caseTerm
-    PatTermBruijnIndex
-    forLambdaApplication
-    forLambdaFunction
+    PatTerm_BjIx
+    forApplication
+    forFn
  where
-  forLambdaApplication =
+  forApplication =
     flip betaReduce
 
-  forLambdaFunction =
-    PatTermLam . crc . normalize
+  forFn =
+    PatTerm_Lam . crc . normalize
 
   -- | Lambda function application.
   -- Does beta-reduce when lambda term matches definition, otherwise does id.
@@ -200,8 +202,8 @@ normalize = crc .
     -> Term -- ^ Expression with the bind applied
   betaReduce a =
     \case
-      (PatTermLam lb) -> substitute a 0 lb -- Apply value to this level binding
-      other -> PatTermApp other a
+      (PatTerm_Lam lb) -> substitute a 0 lb -- Apply value to this level binding
+      other -> PatTerm_App other a
    where
     substitute :: Term -> BjIx -> Term -> Term
     substitute v bji =
@@ -213,13 +215,13 @@ normalize = crc .
       searchIndexAndSubstituteOnMatch =
         bool
           v  -- so substitution under index
-          . PatTermBruijnIndex -- do `id` ("pass")
+          . PatTerm_BjIx -- do `id` ("pass")
           <*> -- patthrough into both branches
             indexNotFound
        where
         indexNotFound = (crc bji /=)
       recurseIntoBothBranches =
-        on PatTermApp (substituteWithPermutatedIndex id)
+        on PatTerm_App (substituteWithPermutatedIndex id)
       -- | Outside Btuijn indexes increase +1 when enterning a scope of deeper function.
       --  2025-05-05: NOTE: This is considered costly compared to nameless encoding style. Since it increments/decrements all instances.
       recurseIntoFunction = substituteWithPermutatedIndex next
@@ -228,16 +230,16 @@ normalize = crc .
 -- *** Testing
 
 mk0 :: Term
-mk0 = mkTermBruijnIndex 0
+mk0 = mkTermBjIx 0
 
-lambdaTermUnitTests :: Seq Term
-lambdaTermUnitTests =
+unitTests :: Seq Term
+unitTests =
   cons
     mk0
     $ (`mkTermApp` mk0) . ($ mk0) <$>
       [ id
-      , PatTermLam
-      , PatTermLam
+      , PatTerm_Lam
+      , PatTerm_Lam
       ]
 
 -- | Parse the expression recieved.
@@ -246,11 +248,11 @@ parse' :: Text -> Either Text Term
 parse' =
   mapLeft
     fromString
-    . parseTermWith parseOnly
+    . parseWith parseOnly
 
 -- | Internalizes Term parser, takes utility parser function of parser, and takes Text into it to parse.
-parseTermWith :: (Parser Term -> Text -> b) -> Text -> b
-parseTermWith f =
+parseWith :: (Parser Term -> Text -> b) -> Text -> b
+parseWith f =
   f parserTerm . (<> "\\n")
 
 turnReadableThenParseBack :: Term -> Either Text Term

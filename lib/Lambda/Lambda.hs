@@ -21,14 +21,14 @@ runOutputUnitTests :: IO ()
 runOutputUnitTests =
   traverse_
     (putTextLn . Closed.turnReadable)
-    Closed.lambdaTermUnitTests
+    Closed.unitTests
 
 -- | Parses only lawful Bruijin lambda terms.
 runParserUnitTests :: IO ()
 runParserUnitTests =
   traverse_
-    (Closed.parseTermWith parseTest . Closed.turnReadable)
-    Closed.lambdaTermUnitTests
+    (Closed.parseWith parseTest . Closed.turnReadable)
+    Closed.unitTests
 
 checkRoundtripParseReadable :: Closed.Term -> RoundTripSuccess
 checkRoundtripParseReadable = crc $
@@ -205,6 +205,6 @@ main =
       output mempty $> R.Exit
 
     allTermUnitTestsRoundtrip :: RoundTripSuccess
-    allTermUnitTestsRoundtrip = crc $ foldr ((&&) . crc checkRoundtripParseReadable) True Closed.lambdaTermUnitTests
+    allTermUnitTestsRoundtrip = crc $ foldr ((&&) . crc checkRoundtripParseReadable) True Closed.unitTests
 
 -- ** Open Lambda calculus term
