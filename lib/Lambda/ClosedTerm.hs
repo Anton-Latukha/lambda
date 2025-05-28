@@ -12,7 +12,6 @@ where
 
 import Lambda.Prelude
 import Lambda.Atom
-import Relude.Extra.Enum (next)
 import qualified Text.Show
 import Data.Attoparsec.Text
     ( decimal, char, parseOnly, string, Parser )
@@ -91,7 +90,7 @@ instance Show ClosedBJHumanReadable where
     l_showHR :: Closed -> String
     l_showHR =
       caseClosed
-        show
+        (show . crc @Natural)
         showApp
         showLam
      where
@@ -111,9 +110,9 @@ turnReadable = show . ClosedBJHumanReadable
 
 -- *** Patterns
 
-pattern Pat_BjIx :: Int -> Closed
-pattern Pat_BjIx n <- (project -> F_BjIx (BjIx n)) where
-        Pat_BjIx n =     embed (  F_BjIx (BjIx n))
+pattern Pat_BjIx :: BjIx -> Closed
+pattern Pat_BjIx n <- (project -> F_BjIx n) where
+        Pat_BjIx n =     embed (  F_BjIx n)
 
 pattern Pat_App :: Closed -> Closed -> Closed
 pattern Pat_App f a <- (project -> F_App (F_AppTarget (embed -> f)) (F_AppParam (embed -> a))) where
@@ -127,8 +126,8 @@ pattern Pat_Lam b <- (project -> F_Lam (F_LamBody (embed -> b))) where
 
 -- *** Builders
 
-mkBjIx :: Int -> Closed
-mkBjIx = Pat_BjIx
+mkBjIx :: Natural -> Closed
+mkBjIx = Pat_BjIx . crc
 
 mkApp :: Closed -> Closed -> Closed
 mkApp = Pat_App
@@ -140,7 +139,7 @@ mkLam = Pat_Lam
 
 -- | Takes a set of for lambda term cases, takes a lambda term, detects term and applies according function to it:
 caseClosed
-  :: (Int -> a)     -- ^ For index
+  :: (BjIx -> a)     -- ^ For index
   -> (Closed -> Closed -> a) -- ^ For application
   -> (Closed -> a)      -- ^ For function
   -> Closed            -- ^ ClosedTerm
@@ -153,8 +152,8 @@ caseClosed cf ca cl =
 
 -- *** Parser
 
-parserClosed :: Parser Closed
-parserClosed =
+parser :: Parser Closed
+parser =
   bjIx <|>
   fn <|>
   app
@@ -170,9 +169,9 @@ parserClosed =
       appPar
    where
     appFn :: Parser Closed =
-      between '(' ')' parserClosed
+      between '(' ')' parser
     appPar :: Parser Closed =
-      char ' ' *> parserClosed
+      char ' ' *> parser
     between bra ket p = char bra *> p <* char ket
 
 -- *** Normal form
@@ -224,7 +223,7 @@ normalize = crc .
         on Pat_App (substituteWithPermutatedIndex id)
       -- | Outside Btuijn indexes increase +1 when enterning a scope of deeper function.
       --  2025-05-05: NOTE: This is considered costly compared to nameless encoding style. Since it increments/decrements all instances.
-      recurseIntoFunction = substituteWithPermutatedIndex next
+      recurseIntoFunction = substituteWithPermutatedIndex succ
       substituteWithPermutatedIndex f = substitute v (f bji)
 
 -- *** Testing
@@ -253,7 +252,7 @@ parse' =
 -- | Internalizes Closed parser, takes utility parser function of parser, and takes Text into it to parse.
 parseWith :: (Parser Closed -> Text -> b) -> Text -> b
 parseWith f =
-  f parserClosed . (<> "\\n")
+  f parser . (<> "\\n")
 
 turnReadableThenParseBack :: Closed -> Either Text Closed
 turnReadableThenParseBack = parse' . turnReadable
