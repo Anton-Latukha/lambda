@@ -106,10 +106,10 @@ optionSet = fullMap
         helpForCommand
      where
       helpNoArgument :: Repl =
-        helpPreamble $ Text.concat $ crc allDocs
+        helpPreamble $ Text.concat $ (\ (crc->n, crc->d) -> n <> " - " <> d <> "\n") <$> allDocs
        where
-        allDocs :: [CommandDocs] =
-          (\ (_,docs,_) -> crc docs) <$> commandList
+        allDocs :: [(CommandName, CommandDocs)] =
+          (\ (name,docs,_) -> (name , crc docs)) <$> commandList
       helpForCommand :: Text -> Repl
       helpForCommand =
         helpPreamble . helpParticularCommand
@@ -121,7 +121,7 @@ optionSet = fullMap
             (crc . docs)
             $ lookup (crc a) fullMap
       helpPreamble =
-        output . ("Help: " <>)
+        output . ("Help:\n" <>)
 
     showTerm :: Text -> Repl
     showTerm =

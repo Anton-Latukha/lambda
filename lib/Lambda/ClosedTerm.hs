@@ -146,9 +146,9 @@ caseClosed
   -> a             -- ^ Result
 caseClosed cf ca cl =
  \case
-  Pat_BjIx i -> cf   i
-  Pat_App       f a -> ca f a
-  Pat_Lam         b -> cl   b
+  Pat_BjIx  i -> cf   i
+  Pat_App f a -> ca f a
+  Pat_Lam   b -> cl   b
 
 -- *** Parser
 
