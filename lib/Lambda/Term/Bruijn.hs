@@ -14,9 +14,9 @@ import Lambda.Prelude
 import Lambda.Atom
 import qualified Text.Show
 import Data.Attoparsec.Text
-    ( decimal, char, parseOnly, string, Parser )
+    ( decimal, char, parseOnly, parseTest, string, Parser )
 import Data.Functor.Classes ( Eq1(..) )
-import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..), Algebra, Coalgebra )
+-- import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..), Algebra, Coalgebra )
 
 -- ** Lambda calculi
 
@@ -250,6 +250,17 @@ runUnitTestsWith f =
   traverse_
     f
     unitTests
+
+runTurnReadableUnitTests :: IO ()
+runTurnReadableUnitTests =
+  runUnitTestsWith
+    (putTextLn . turnReadable)
+
+-- | Parses only lawful Bruijin lambda terms.
+runParserUnitTestsFromTurningTermReadable :: IO ()
+runParserUnitTestsFromTurningTermReadable =
+  runUnitTestsWith
+    (parseWith parseTest . turnReadable)
 
 -- | Parse the expression recieved.
 -- Wrapper around @parseOnly@, so expects full expression at once, hence strict.

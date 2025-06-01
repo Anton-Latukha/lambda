@@ -12,22 +12,10 @@ import Lambda.Term.Bruijn (Bruijn(..))
 import qualified Lambda.Term.Bruijn as Bruijn
 import Relude.Extra.Map
 import qualified Data.Text as Text
-import Data.Attoparsec.Text ( parseTest )
 import qualified System.Console.Repline as R
 import System.Process (callCommand)
 
 -- *** Testing
-
-runOutputUnitTests :: IO ()
-runOutputUnitTests =
-  Bruijn.runUnitTestsWith
-    (putTextLn . Bruijn.turnReadable)
-
--- | Parses only lawful Bruijin lambda terms.
-runParserUnitTests :: IO ()
-runParserUnitTests =
-  Bruijn.runUnitTestsWith
-    (Bruijn.parseWith parseTest . Bruijn.turnReadable)
 
 checkRoundtripParseReadable :: Bruijn -> RoundTripSuccess
 checkRoundtripParseReadable = crc $
@@ -141,10 +129,10 @@ main :: IO ()
 main =
   do
     putTextLn "\nRunning Output Unit Tests ..."
-    runOutputUnitTests
+    Bruijn.runTurnReadableUnitTests
 
     putTextLn "\nRunning Parser Unit Tests ..."
-    runParserUnitTests
+    Bruijn.runParserUnitTestsFromTurningTermReadable
 
     putTextLn "\nRunning Roundtrip Unit Tests ..."
     putTextLn $ show allTermUnitTestsRoundtrip
