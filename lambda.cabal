@@ -79,9 +79,8 @@ library
     Lambda.Util
     Lambda.Prelude
     Lambda.Atom
-    Lambda.ClosedTerm
+    Lambda.Term.Bruijn
     Lambda.Lambda
-    -- Lambda.LNR
 
   other-modules:
     Paths_lambda

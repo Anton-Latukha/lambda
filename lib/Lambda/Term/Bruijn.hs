@@ -5,7 +5,7 @@
 {-# hlint ignore "Use camelCase" #-}
 
 -- | The context of this module is closed lambda terms only (aka: lawful lambda term that has no free variables)
-module Lambda.ClosedTerm
+module Lambda.Term.Bruijn
 where
 
 -- ** Import
@@ -24,8 +24,6 @@ import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..)
 
 -- **** New type typisation for closed Lambda term
 
--- | If Lambda term has no free variables, it is called Closed.
-
 newtype F_AppTarget a = F_AppTarget (F a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
 
@@ -34,6 +32,12 @@ newtype F_AppParam a = F_AppParam (F a)
 
 newtype F_LamBody a = F_LamBody (F a)
  deriving (Eq, Eq1, Show, Generic, Functor, Traversable, Foldable)
+
+-- | Level of lambda term.
+-- Used in reverese to normal brujuin index, and as such does not need to increment the stack under in-depth substitution, and always can relate variable index to level.
+-- `throw (Underflow :: ArithException).`
+newtype F_LamLvl = F_LamLvl Natural
+ deriving (Eq, Show, Generic)
 
 -- **** Functorial Lambda term/expression
 
@@ -45,17 +49,17 @@ data F a
 
 -- ***** Instances
 
-instance Recursive (->) Closed F where
-  cata :: Algebra (->) F a -> Closed -> a
-  cata φ (Closed (Mu f)) = f φ
+instance Recursive (->) Bruijn F where
+  cata :: Algebra (->) F a -> Bruijn -> a
+  cata φ (Bruijn (Mu f)) = f φ
 
-instance Projectable (->) Closed F where
-  project :: Coalgebra (->) F Closed
+instance Projectable (->) Bruijn F where
+  project :: Coalgebra (->) F Bruijn
   project = lambek
 
-instance Steppable (->) Closed F where
-  embed :: Algebra (->) F Closed
-  embed m = Closed $ Mu $ \ f -> f $ fmap (cata f) m
+instance Steppable (->) Bruijn F where
+  embed :: Algebra (->) F Bruijn
+  embed m = Bruijn $ Mu $ \ f -> f $ fmap (cata f) m
 
 instance Eq1 F where
   liftEq :: (a -> b -> Bool) -> F a -> F b -> Bool
@@ -72,53 +76,53 @@ instance Eq1 F where
 
 -- **** Finished term
 
-newtype Closed = Closed (Mu F)
+newtype Bruijn = Bruijn (Mu F)
  deriving (Eq, Generic)
 
 -- *** Isomorphism of lambda term to human readable representation
 
 -- | Abstraction for representation of human readable view of the closed lambda term datatype
-newtype ClosedBJHumanReadable = ClosedBJHumanReadable Closed
+newtype BruijnBJHumanReadable = BruijnBJHumanReadable Bruijn
 
 -- **** Instances
 
-instance Show ClosedBJHumanReadable where
-  show :: ClosedBJHumanReadable -> String
+instance Show BruijnBJHumanReadable where
+  show :: BruijnBJHumanReadable -> String
   show = l_showHR . crc
    where
     -- | There is a newtype boundary between main lambda term data type and human readable, code prefers to preserve the general GHC derived @Show@ instances for the general case (showing term/expression internals) for the lambda term and its components, which is why this coersion enforsment is needed.
-    l_showHR :: Closed -> String
+    l_showHR :: Bruijn -> String
     l_showHR =
-      caseClosed
+      caseBruijn
         (show . crc @Natural)
         showApp
         showLam
      where
-      showApp :: Closed -> Closed -> String
+      showApp :: Bruijn -> Bruijn -> String
       showApp f a = "(" <> l_showHR f <> ") " <> l_showHR a
-      showLam :: Closed -> String
+      showLam :: Bruijn -> String
       showLam b = "\\ " <> l_showHR b
 
-instance Show Closed where
-  show :: Closed -> String
-  show (crc @ClosedBJHumanReadable -> a) = show a
+instance Show Bruijn where
+  show :: Bruijn -> String
+  show (crc @BruijnBJHumanReadable -> a) = show a
 
 -- **** Functions
 
-turnReadable :: Closed -> Text
-turnReadable = show . ClosedBJHumanReadable
+turnReadable :: Bruijn -> Text
+turnReadable = show . BruijnBJHumanReadable
 
 -- *** Patterns
 
-pattern Pat_BjIx :: BjIx -> Closed
+pattern Pat_BjIx :: BjIx -> Bruijn
 pattern Pat_BjIx n <- (project -> F_BjIx n) where
         Pat_BjIx n =     embed (  F_BjIx n)
 
-pattern Pat_App :: Closed -> Closed -> Closed
+pattern Pat_App :: Bruijn -> Bruijn -> Bruijn
 pattern Pat_App f a <- (project -> F_App (F_AppTarget (embed -> f)) (F_AppParam (embed -> a))) where
         Pat_App f a =     embed (  F_App (F_AppTarget (project  f)) (F_AppParam (project  a)))
 
-pattern Pat_Lam :: Closed -> Closed
+pattern Pat_Lam :: Bruijn -> Bruijn
 pattern Pat_Lam b <- (project -> F_Lam (F_LamBody (embed -> b))) where
         Pat_Lam b =     embed (  F_Lam (F_LamBody (project  b)))
 
@@ -126,25 +130,25 @@ pattern Pat_Lam b <- (project -> F_Lam (F_LamBody (embed -> b))) where
 
 -- *** Builders
 
-mkBjIx :: Natural -> Closed
+mkBjIx :: Natural -> Bruijn
 mkBjIx = Pat_BjIx . crc
 
-mkApp :: Closed -> Closed -> Closed
+mkApp :: Bruijn -> Bruijn -> Bruijn
 mkApp = Pat_App
 
-mkLam :: Closed -> Closed
+mkLam :: Bruijn -> Bruijn
 mkLam = Pat_Lam
 
 -- *** Helpers
 
 -- | Takes a set of for lambda term cases, takes a lambda term, detects term and applies according function to it:
-caseClosed
+caseBruijn
   :: (BjIx -> a)     -- ^ For index
-  -> (Closed -> Closed -> a) -- ^ For application
-  -> (Closed -> a)      -- ^ For function
-  -> Closed            -- ^ ClosedTerm
+  -> (Bruijn -> Bruijn -> a) -- ^ For application
+  -> (Bruijn -> a)      -- ^ For function
+  -> Bruijn            -- ^ BruijnTerm
   -> a             -- ^ Result
-caseClosed cf ca cl =
+caseBruijn cf ca cl =
  \case
   Pat_BjIx  i -> cf   i
   Pat_App f a -> ca f a
@@ -152,36 +156,36 @@ caseClosed cf ca cl =
 
 -- *** Parser
 
-parser :: Parser Closed
+parser :: Parser Bruijn
 parser =
   bjIx <|>
   fn <|>
   app
  where
-  bjIx :: Parser Closed =
+  bjIx :: Parser Bruijn =
     mkBjIx <$> decimal
-  fn :: Parser Closed =
+  fn :: Parser Bruijn =
     mkLam <$> (string "\\ " *> bjIx)
-  app :: Parser Closed =
+  app :: Parser Bruijn =
     liftA2
       mkApp
       appFn
       appPar
    where
-    appFn :: Parser Closed =
+    appFn :: Parser Bruijn =
       between '(' ')' parser
-    appPar :: Parser Closed =
+    appPar :: Parser Bruijn =
       char ' ' *> parser
     between bra ket p = char bra *> p <* char ket
 
 -- *** Normal form
 
 -- | Normal form lambda term.
-newtype NClosed = NClosed Closed
+newtype NBruijn = NBruijn Bruijn
 
-normalize :: Closed -> NClosed
+normalize :: Bruijn -> NBruijn
 normalize = crc .
-  caseClosed
+  caseBruijn
     Pat_BjIx
     forApplication
     forFn
@@ -196,17 +200,17 @@ normalize = crc .
   -- Does beta-reduce when lambda term matches definition, otherwise does id.
   -- TODO: Try for this function to return Maybe.
   betaReduce
-    :: Closed -- ^ Argument to bind
-    -> Closed -- ^ Base expression to bind in
-    -> Closed -- ^ Expression with the bind applied
+    :: Bruijn -- ^ Argument to bind
+    -> Bruijn -- ^ Base expression to bind in
+    -> Bruijn -- ^ Expression with the bind applied
   betaReduce a =
     \case
       (Pat_Lam lb) -> substitute a 0 lb -- Apply value to this level binding
       other -> Pat_App other a
    where
-    substitute :: Closed -> BjIx -> Closed -> Closed
+    substitute :: Bruijn -> BjIx -> Bruijn -> Bruijn
     substitute v bji =
-      caseClosed
+      caseBruijn
         searchIndexAndSubstituteOnMatch
         recurseIntoBothBranches
         recurseIntoFunction
@@ -228,10 +232,10 @@ normalize = crc .
 
 -- *** Testing
 
-mk0 :: Closed
+mk0 :: Bruijn
 mk0 = mkBjIx 0
 
-unitTests :: Seq Closed
+unitTests :: Seq Bruijn
 unitTests =
   cons
     mk0
@@ -243,17 +247,17 @@ unitTests =
 
 -- | Parse the expression recieved.
 -- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
-parse' :: Text -> Either Text Closed
+parse' :: Text -> Either Text Bruijn
 parse' =
   mapLeft
     fromString
     . parseWith parseOnly
 
--- | Internalizes Closed parser, takes utility parser function of parser, and takes Text into it to parse.
-parseWith :: (Parser Closed -> Text -> b) -> Text -> b
+-- | Internalizes Bruijn parser, takes utility parser function of parser, and takes Text into it to parse.
+parseWith :: (Parser Bruijn -> Text -> b) -> Text -> b
 parseWith f =
   f parser . (<> "\\n")
 
-turnReadableThenParseBack :: Closed -> Either Text Closed
+turnReadableThenParseBack :: Bruijn -> Either Text Bruijn
 turnReadableThenParseBack = parse' . turnReadable
 

@@ -8,8 +8,8 @@ module Lambda.Lambda
 -- ** Import
 
 import Lambda.Prelude
-import Lambda.ClosedTerm (Closed(..))
-import qualified Lambda.ClosedTerm as Closed
+import Lambda.Term.Bruijn (Bruijn(..))
+import qualified Lambda.Term.Bruijn as Bruijn
 import Relude.Extra.Map
 import qualified Data.Text as Text
 import Data.Attoparsec.Text ( parseTest )
@@ -21,26 +21,26 @@ import System.Process (callCommand)
 runOutputUnitTests :: IO ()
 runOutputUnitTests =
   traverse_
-    (putTextLn . Closed.turnReadable)
-    Closed.unitTests
+    (putTextLn . Bruijn.turnReadable)
+    Bruijn.unitTests
 
 -- | Parses only lawful Bruijin lambda terms.
 runParserUnitTests :: IO ()
 runParserUnitTests =
   traverse_
-    (Closed.parseWith parseTest . Closed.turnReadable)
-    Closed.unitTests
+    (Bruijn.parseWith parseTest . Bruijn.turnReadable)
+    Bruijn.unitTests
 
-checkRoundtripParseReadable :: Closed -> RoundTripSuccess
+checkRoundtripParseReadable :: Bruijn -> RoundTripSuccess
 checkRoundtripParseReadable = crc $
   either
     (const False)
     . (==)
-    <*> Closed.turnReadableThenParseBack
+    <*> Bruijn.turnReadableThenParseBack
 
-parseApplyPrint :: (Closed -> Closed) -> Text -> Repl
+parseApplyPrint :: (Bruijn -> Bruijn) -> Text -> Repl
 parseApplyPrint f =
-  output . fromEither . ((Closed.turnReadable . f) <$>) . Closed.parse'
+  output . fromEither . ((Bruijn.turnReadable . f) <$>) . Bruijn.parse'
 
 -- ** REPL
 
@@ -129,7 +129,7 @@ optionSet = fullMap
 
     normalForm :: Text -> Repl
     normalForm =
-      parseApplyPrint (crc . Closed.normalize)
+      parseApplyPrint (crc . Bruijn.normalize)
 
     cowsay :: Text -> Repl
     cowsay =
@@ -163,7 +163,7 @@ main =
       (crc finalizer)
    where
     allTermUnitTestsRoundtrip :: RoundTripSuccess
-    allTermUnitTestsRoundtrip = crc $ foldr ((&&) . crc checkRoundtripParseReadable) True Closed.unitTests
+    allTermUnitTestsRoundtrip = crc $ foldr ((&&) . crc checkRoundtripParseReadable) True Bruijn.unitTests
 
     banner :: R.MultiLine -> ReplF String
     banner =
