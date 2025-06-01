@@ -245,6 +245,12 @@ unitTests =
       , Pat_Lam
       ]
 
+runUnitTestsWith :: Applicative f => (Bruijn -> f b) -> f ()
+runUnitTestsWith f =
+  traverse_
+    f
+    unitTests
+
 -- | Parse the expression recieved.
 -- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
 parse' :: Text -> Either Text Bruijn

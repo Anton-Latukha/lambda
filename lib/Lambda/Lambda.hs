@@ -20,16 +20,14 @@ import System.Process (callCommand)
 
 runOutputUnitTests :: IO ()
 runOutputUnitTests =
-  traverse_
+  Bruijn.runUnitTestsWith
     (putTextLn . Bruijn.turnReadable)
-    Bruijn.unitTests
 
 -- | Parses only lawful Bruijin lambda terms.
 runParserUnitTests :: IO ()
 runParserUnitTests =
-  traverse_
+  Bruijn.runUnitTestsWith
     (Bruijn.parseWith parseTest . Bruijn.turnReadable)
-    Bruijn.unitTests
 
 checkRoundtripParseReadable :: Bruijn -> RoundTripSuccess
 checkRoundtripParseReadable = crc $
