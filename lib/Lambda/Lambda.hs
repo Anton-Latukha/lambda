@@ -79,7 +79,7 @@ optionSet = fullMap
       [
         ("help"     ,"documentation on REPL commands"        ,help      ),
         ("print"    ,"Echo what was put in"                  ,output    ),
-        ("showExpr" ,"Parse and print back lambda expression",showTerm  ),
+        ("showTerm" ,"Parse and print back lambda expression",showTerm  ),
         ("norm"     ,"Produce normal form"                   ,normalForm),
         ("cowsay"   ,""                                      ,cowsay    )
       ]
@@ -209,5 +209,3 @@ main =
     -- | What to do/print on Ctrl+D (aka user making exit)
     finalizer :: ReplF R.ExitDecision =
       output mempty $> R.Exit
-
--- ** Open Lambda calculus term
