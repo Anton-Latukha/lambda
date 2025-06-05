@@ -16,7 +16,7 @@ import qualified Text.Show
 import Data.Attoparsec.Text
     ( decimal, char, parseOnly, parseTest, string, Parser )
 import Data.Functor.Classes ( Eq1(..) )
--- import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..), Algebra, Coalgebra )
+import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..), Algebra)
 
 -- ** Lambda calculi
 
@@ -49,18 +49,6 @@ data F a
 
 -- ***** Instances
 
-instance Recursive (->) Bruijn F where
-  cata :: Algebra (->) F a -> Bruijn -> a
-  cata φ (Bruijn (Mu f)) = f φ
-
-instance Projectable (->) Bruijn F where
-  project :: Coalgebra (->) F Bruijn
-  project = lambek
-
-instance Steppable (->) Bruijn F where
-  embed :: Algebra (->) F Bruijn
-  embed m = Bruijn $ Mu $ \ f -> f $ fmap (cata f) m
-
 instance Eq1 F where
   liftEq :: (a -> b -> Bool) -> F a -> F b -> Bool
   --  2025-05-20: FIXME: eq function `(a -> b -> Bool)` is ignored.
@@ -78,6 +66,20 @@ instance Eq1 F where
 
 newtype Bruijn = Bruijn (Mu F)
  deriving (Eq, Generic)
+
+-- ***** Instances for `Bruijn`
+-- Are based on the default instances of the `Mu`
+instance Recursive (->) Bruijn F where
+  cata :: Algebra (->) F a -> Bruijn -> a
+  cata φ (Bruijn (Mu f)) = f φ
+
+instance Projectable (->) Bruijn F where
+  project :: Bruijn -> F Bruijn
+  project = lambek
+
+instance Steppable (->) Bruijn F where
+  embed :: Algebra (->) F Bruijn
+  embed m = Bruijn $ Mu $ \ f -> f $ fmap (cata f) m
 
 -- *** Isomorphism of lambda term to human readable representation
 
