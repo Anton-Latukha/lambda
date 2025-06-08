@@ -11,6 +11,7 @@ where
 -- ** Import
 
 import Lambda.Prelude
+import GHC.Num ( naturalZero )
 import Lambda.Atom
 import qualified Text.Show
 import Data.Attoparsec.Text
@@ -46,6 +47,16 @@ data F a
   | F_App    !(F_AppTarget a) !(F_AppParam a)
   | F_Lam    !(F_LamBody a)
  deriving (Eq, Show, Generic, Functor, Traversable, Foldable)
+
+-- | `Semigroup` in terms of Lambda Calculus would be simply applying expressions after another (because of also see `Monoid`)
+instance Semigroup (F a) where
+  (<>) :: F a -> F a -> F a
+  (<>) fa fb = F_App (crc fa) (crc fb)
+
+-- | `Monoid` for Lambda Calculus is id function, aka `\ a -> a`
+instance Monoid (F a) where
+  mempty :: F a
+  mempty = F_Lam $ crc $ F_BjIx $ crc naturalZero
 
 -- ***** Instances
 
