@@ -79,7 +79,6 @@ import           Codec.Serialise                ( Serialise )
 import           Control.Monad.Fix              ( MonadFix(..) )
 import           Control.Monad.Free             ( Free(..) )
 import           Control.Monad.Trans.Control    ( MonadTransControl(..) )
-import qualified Data.Aeson                    as A
 import           Data.Fix                       ( Fix(..) )
 import qualified Data.Text                     as Text
 import           Lens.Family2                  as X
@@ -282,7 +281,7 @@ free fP fF fr =
 newtype Path = Path FilePath
   deriving
     ( Eq, Ord, Generic
-    , Typeable, Data, NFData, Serialise, Binary, A.ToJSON, A.FromJSON
+    , Typeable, Data, NFData, Serialise, Binary
     , Show, Read, Hashable
     , Semigroup, Monoid
     )

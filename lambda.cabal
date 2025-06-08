@@ -78,6 +78,7 @@ library
   exposed-modules:
     Lambda.Util
     Lambda.Prelude
+    -- Lambda.Term.Basic
     Lambda.Atom
     Lambda.Term.Bruijn
     Lambda.Lambda
@@ -94,7 +95,6 @@ library
     , serialise
     , free
     , monad-control
-    , aeson
     , data-fix
     , lens-family
     , filepath
@@ -104,7 +104,11 @@ library
     , process
 
     -- 2025-05-02: NOTE: imports for "Lambda.Lambda"
+    -- 2025-06-02: NOTE: For previously made code, until data types switch to recursion-schemes
     , yaya
+    --  2025-06-02: NOTE:  Contains Mu Nu & such for recursion-schemes
+    , data-fix
+    -- | Parser is build on library `attoparsec`
     , attoparsec
 
 executable lambda
