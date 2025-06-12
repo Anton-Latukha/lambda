@@ -11,7 +11,6 @@ where
 -- ** Import
 
 import Lambda.Prelude
-import GHC.Num ( naturalZero )
 import Lambda.Atom
 import qualified Text.Show
 import Data.Attoparsec.Text
@@ -186,6 +185,19 @@ parser =
       char ' ' *> parser
     between bra ket p = char bra *> p <* char ket
 
+-- | Internalizes Bruijn parser, takes utility parser function of parser, and takes Text into it to parse.
+parseWith :: (Parser Bruijn -> Text -> b) -> Text -> b
+parseWith f =
+  f parser . (<> "\\n")
+
+-- | Parse the expression recieved.
+-- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
+parse' :: Text -> Either Text Bruijn
+parse' =
+  mapLeft
+    fromString
+    . parseWith parseOnly
+
 -- *** Normal form
 
 -- | Normal form lambda term.
@@ -269,19 +281,6 @@ runParserUnitTestsFromTurningTermReadable :: IO ()
 runParserUnitTestsFromTurningTermReadable =
   runUnitTestsWith
     (parseWith parseTest . turnReadable)
-
--- | Parse the expression recieved.
--- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
-parse' :: Text -> Either Text Bruijn
-parse' =
-  mapLeft
-    fromString
-    . parseWith parseOnly
-
--- | Internalizes Bruijn parser, takes utility parser function of parser, and takes Text into it to parse.
-parseWith :: (Parser Bruijn -> Text -> b) -> Text -> b
-parseWith f =
-  f parser . (<> "\\n")
 
 turnReadableThenParseBack :: Bruijn -> Either Text Bruijn
 turnReadableThenParseBack = parse' . turnReadable
