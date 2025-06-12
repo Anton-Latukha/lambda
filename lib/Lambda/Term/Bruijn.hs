@@ -48,15 +48,10 @@ data F a
   | F_Lam    !(F_LamBody a)
  deriving (Eq, Show, Generic, Functor, Traversable, Foldable)
 
--- | Lets `Semigroup` in terms of Lambda Calculus would be simply applying expressions after another (because of also see `Monoid`)
+-- | Lets `Semigroup` in terms of Lambda Calculus would be simply applying expressions.
 instance Semigroup (F a) where
   (<>) :: F a -> F a -> F a
   (<>) fa fb = F_App (crc fa) (crc fb)
-
--- | `Monoid` for Lambda Calculus is id function, aka `\ a -> a`
-instance Monoid (F a) where
-  mempty :: F a
-  mempty = F_Lam $ crc $ F_BjIx $ crc naturalZero
 
 -- ***** Instances
 
