@@ -81,6 +81,7 @@ library
     -- Lambda.Term.Basic
     Lambda.Atom
     Lambda.Term.Bruijn
+    Lambda.Term.Bruijn.Leveled
     Lambda.Lambda
 
   other-modules:
