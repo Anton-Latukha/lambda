@@ -123,15 +123,15 @@ turnReadable = show . BruijnBJHumanReadable
 
 pattern Pat_BjIx :: BjIx -> Bruijn
 pattern Pat_BjIx n <- (project -> F_BjIx n) where
-        Pat_BjIx n =     embed (  F_BjIx n)
+        Pat_BjIx n =    embed ( F_BjIx n)
 
 pattern Pat_App :: Bruijn -> Bruijn -> Bruijn
 pattern Pat_App f a <- (project -> F_App (F_AppTarget (embed -> f)) (F_AppParam (embed -> a))) where
-        Pat_App f a =     embed (  F_App (F_AppTarget (project  f)) (F_AppParam (project  a)))
+        Pat_App f a =    embed ( F_App (F_AppTarget (project f)) (F_AppParam (project a)))
 
 pattern Pat_Lam :: Bruijn -> Bruijn
 pattern Pat_Lam b <- (project -> F_Lam (F_LamBody (embed -> b))) where
-        Pat_Lam b =     embed (  F_Lam (F_LamBody (project  b)))
+        Pat_Lam b =    embed ( F_Lam (F_LamBody (project b)))
 
 {-# complete Pat_BjIx, Pat_App, Pat_Lam #-}
 
@@ -266,10 +266,7 @@ unitTests =
       ]
 
 runUnitTestsWith :: Applicative f => (Bruijn -> f b) -> f ()
-runUnitTestsWith f =
-  traverse_
-    f
-    unitTests
+runUnitTestsWith = (`traverse_` unitTests)
 
 runTurnReadableUnitTests :: IO ()
 runTurnReadableUnitTests =
