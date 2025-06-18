@@ -4,7 +4,8 @@
 {-# options_GHC -Wno-unrecognised-pragmas #-}
 {-# hlint ignore "Use camelCase" #-}
 
--- | The context of this module is closed lambda terms only (aka: lawful lambda term that has no free variables)
+-- | The context of this module is:
+-- closed lambda terms only (aka: lawful lambda term that has no free variables)
 module Lambda.Term.Bruijn
 where
 
