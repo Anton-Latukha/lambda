@@ -290,15 +290,21 @@ unitTestsText =
 
 -- *** Normalization by evaluation (NeB)
 
--- newtype ContextedTerm = ContextedTerm (ContextBinds a)
+newtype OutsideValName = OutsideValName Text
 
--- neb :: ContextedTerm -> Bruijn -> _
--- neb cnt =
---   traverse (replaceFreeVars) lt
---  where
---   findFreeVar f =
---     caseBruijn
---       id
---       id
---       id
---       (\ fv -> lookup fv cnt)
+newtype OutsideVal
+  = OutsideVal (OutsideVal -> IO OutsideVal)
+
+neb :: ContextBinds -> Bruijn -> IO Bruijn
+neb cnt lt =
+  undefined replaceFreeVars $ project lt
+ where
+  replaceFreeVars :: Bruijn -> IO Bruijn
+  replaceFreeVars brj =
+    caseBruijn
+      (undefined) -- Ideally this should be impossible, all LvlBinds should be applied before this, which means different type
+      (undefined)
+      (undefined)
+      (\ fv -> undefined $ maybe (undefined) (undefined) $ lookupHM (crc @(HashMap FreeVar VarValue) cnt) fv)
+      brj
+
