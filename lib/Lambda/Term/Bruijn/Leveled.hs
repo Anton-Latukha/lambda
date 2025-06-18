@@ -15,13 +15,16 @@ where
 
 -- ** Import
 
-import Lambda.Prelude
+import Lambda.Prelude hiding ( fromEither )
 import Data.Char ( isAlphaNum )
 import qualified Text.Show
 import Data.Attoparsec.Text
     ( decimal, char, parseOnly, string, Parser)
 import Data.Functor.Classes ( Eq1(..) )
 import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..), Algebra)
+import Data.Validation ( Validation(..), validate, validation, fromEither )
+import qualified Data.Validation as Validation
+import Data.Foldable1 (Foldable1(toNonEmpty))
 
 
 -- ** Lambda calculi
@@ -37,13 +40,13 @@ import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..)
 newtype LvlBind = LvlBind Natural
  deriving (Eq, Enum, Num, Show, Generic, Ord, Real, Integral)
 
-newtype F_AppTarget a = F_AppTarget (F a)
+newtype F_AppTarget b a = F_AppTarget (F b a)
  deriving (Eq, Eq1, Show, Generic, Functor, Foldable, Traversable)
 
-newtype F_AppParam a = F_AppParam (F a)
+newtype F_AppParam b a = F_AppParam (F b a)
  deriving (Eq, Eq1, Show, Generic, Functor, Foldable, Traversable)
 
-newtype F_LamBody a = F_LamBody (F a)
+newtype F_LamBody b a = F_LamBody (F b a)
  deriving (Eq, Eq1, Show, Generic, Functor, Foldable, Traversable)
 
 -- | Level of lambda term.
@@ -53,7 +56,7 @@ newtype F_LamLvl = F_LamLvl Natural
  deriving (Eq, Show, Generic)
 
 newtype FreeVar = FreeVar Text
- deriving (Eq, Show, Generic)
+ deriving (Eq, Show, Generic, Hashable)
 
 -- | Value binded to formerly free var.
 newtype VarValue = VarValue Text
@@ -69,22 +72,24 @@ newtype LamEnv binding = LamEnv (NonEmpty binding)
 
 -- **** Functorial form of Lambda expression
 
-data F a
+-- | Data type expects/keeps internal bindings in terms of de Bruijn levels.
+-- The `F_Feature` allows to combine a lot of data types (with `FreeVar`iables, without them, with evaluated values or without them, etc.)
+data F b f
   = F_LvlBind    !LvlBind
-  | F_Lam     !(F_LamBody a)
-  | F_App     !(F_AppTarget a) !(F_AppParam a)
-  | F_FreeVar !FreeVar
+  | F_Lam     !(F_LamBody b f)
+  | F_App     !(F_AppTarget b f) !(F_AppParam b f)
+  | F_Feature !b
  deriving (Eq, Show, Generic, Functor, Traversable, Foldable)
 
 -- | Lets `Semigroup` in terms of Lambda Calculus would be simply applying expressions.
-instance Semigroup (F a) where
-  (<>) :: F a -> F a -> F a
+instance Semigroup (F b a) where
+  (<>) :: F b a -> F b a -> F b a
   (<>) fa fb = F_App (crc fa) (crc fb)
 
 -- ***** Instances
 
-instance Eq1 F where
-  liftEq :: (a -> b -> Bool) -> F a -> F b -> Bool
+instance Eq f => Eq1 (F f) where
+  liftEq :: (a -> b -> Bool) -> F f a -> F f b -> Bool
   --  2025-05-20: FIXME: eq function `(a -> b -> Bool)` is ignored.
   -- If there was Applicative to `F` the implementation then is `fold $ liftA2 eq a b`
   liftEq _ = go  -- Making shure GHC detects that there is no point to go through typeclass dictionary searches, all other instances derive from here.
@@ -94,42 +99,42 @@ instance Eq1 F where
                                                          (crc go p1 p2)
     go (F_LvlBind idx1 ) (F_LvlBind idx2 ) = (==) idx1
                                            idx2
-    go (F_FreeVar bind1 ) (F_FreeVar bind2 ) = (==) bind1
+    go (F_Feature bind1 ) (F_Feature bind2 ) = (==) bind1
                                              bind2
     go _ _ = False
 
 -- **** Finished term
 
-newtype Bruijn = Bruijn (Mu F)
+newtype Bruijn b = Bruijn (Mu (F b))
  deriving (Eq, Generic)
 
 -- ***** Instances for `Bruijn`
 -- Are based on the default instances of the `Mu`
-instance Recursive (->) Bruijn F where
-  cata :: Algebra (->) F a -> Bruijn -> a
+instance Recursive (->) (Bruijn b) (F b) where
+  cata :: Algebra (->) (F b) a -> Bruijn b -> a
   cata φ (Bruijn (Mu f)) = f φ
 
-instance Projectable (->) Bruijn F where
-  project :: Bruijn -> F Bruijn
+instance Projectable (->) (Bruijn b) (F b) where
+  project :: Bruijn b -> F b (Bruijn b)
   project = lambek
 
-instance Steppable (->) Bruijn F where
-  embed :: Algebra (->) F Bruijn
+instance Steppable (->) (Bruijn b) (F b) where
+  embed :: Algebra (->) (F b) (Bruijn b)
   embed m = Bruijn $ Mu $ \ f -> f $ fmap (cata f) m
 
 -- *** Isomorphism of lambda term to human readable representation
 
 -- | Abstraction for representation of human readable view of the closed lambda term datatype
-newtype BruijnBJHumanReadable = BruijnBJHumanReadable Bruijn
+newtype BruijnBJHumanReadable b = BruijnBJHumanReadable (Bruijn b)
 
 -- **** Instances
 
-instance Show BruijnBJHumanReadable where
-  show :: BruijnBJHumanReadable -> String
+instance Show b => Show (BruijnBJHumanReadable b) where
+  show :: BruijnBJHumanReadable b -> String
   show = l_showHR . crc
    where
     -- | There is a newtype boundary between main lambda term data type and human readable, code prefers to preserve the general GHC derived @Show@ instances for the general case (showing term/expression internals) for the lambda term and its components, which is why this coersion enforsment is needed.
-    l_showHR :: Bruijn -> String
+    l_showHR :: Bruijn b -> String
     l_showHR =
       caseBruijn
         (show . crc @Natural)
@@ -137,24 +142,24 @@ instance Show BruijnBJHumanReadable where
         showLam
         show
      where
-      showApp :: Bruijn -> Bruijn -> String
+      showApp :: Bruijn b -> Bruijn b -> String
       showApp f a = "(" <> l_showHR f <> ") " <> l_showHR a
-      showLam :: Bruijn -> String
+      showLam :: Bruijn b -> String
       showLam b = "\\ " <> l_showHR b
 
-instance Show Bruijn where
-  show :: Bruijn -> String
-  show (crc @BruijnBJHumanReadable -> a) = show a
+instance Show b => Show (Bruijn b) where
+  show :: Bruijn b -> String
+  show (crc @(BruijnBJHumanReadable b) -> a) = show a
 
 -- **** Functions
 
-turnReadable :: Bruijn -> Text
+turnReadable :: Show b => Bruijn b -> Text
 turnReadable = show . BruijnBJHumanReadable
 
 -- *** Patterns
 
 -- | Turn level of bind into expression (and back).
-pattern Pat_LvlBind :: LvlBind -> Bruijn
+pattern Pat_LvlBind :: LvlBind -> Bruijn b
 pattern Pat_LvlBind n <- (project -> F_LvlBind n) where
         Pat_LvlBind n =    embed ( F_LvlBind n)
 
@@ -162,53 +167,53 @@ pattern Pat_LvlBind n <- (project -> F_LvlBind n) where
 -- 1 -> Target of application;
 -- 2 -> Parameter to apply to;
 -- \therefore: expression of applicaiton.
-pattern Pat_App :: Bruijn -> Bruijn -> Bruijn
+pattern Pat_App :: Bruijn b -> Bruijn b -> Bruijn b
 pattern Pat_App f a <- (project -> F_App (F_AppTarget (embed -> f)) (F_AppParam (embed -> a))) where
         Pat_App f a =    embed ( F_App (F_AppTarget (project f)) (F_AppParam (project a)))
 
 -- | Take expression and wrap it into a lambda (and back).
-pattern Pat_Lam :: Bruijn -> Bruijn
+pattern Pat_Lam :: Bruijn b -> Bruijn b
 pattern Pat_Lam b <- (project -> F_Lam (F_LamBody (embed -> b))) where
         Pat_Lam b =    embed ( F_Lam (F_LamBody (project b)))
 
 -- | Take FreeVar and produce expression primitive (and back).
-pattern Pat_FreeVar :: FreeVar -> Bruijn
-pattern Pat_FreeVar b <- (project -> F_FreeVar b) where
-        Pat_FreeVar b =    embed ( F_FreeVar b)
+pattern Pat_Feature :: b -> Bruijn b
+pattern Pat_Feature b <- (project -> F_Feature b) where
+        Pat_Feature b =    embed ( F_Feature b)
 
-{-# complete Pat_LvlBind, Pat_App, Pat_Lam, Pat_FreeVar #-}
+{-# complete Pat_LvlBind, Pat_App, Pat_Lam, Pat_Feature #-}
 
 -- *** Builders
 
 -- | Encode level to bind to into expression.
-mkLvlBind :: Natural -> Bruijn
+mkLvlBind :: Natural -> Bruijn b
 mkLvlBind = Pat_LvlBind . crc
 
-mkApp :: Bruijn -> Bruijn -> Bruijn
+mkApp :: Bruijn b -> Bruijn b -> Bruijn b
 mkApp = Pat_App
 
-mkLam :: Bruijn -> Bruijn
+mkLam :: Bruijn b -> Bruijn b
 mkLam = Pat_Lam
 
-mkFreeVar :: Text -> Bruijn
-mkFreeVar = Pat_FreeVar . crc
+mkFreeVar :: Text -> Bruijn FreeVar
+mkFreeVar = Pat_Feature . crc
 
 -- *** Helpers
 
 -- | Takes a set of for lambda term cases, takes a lambda term, detects term and applies according function to it:
 caseBruijn
-  :: (LvlBind -> a)     -- ^ For index
-  -> (Bruijn -> Bruijn -> a) -- ^ For application
-  -> (Bruijn -> a)      -- ^ For function
-  -> (FreeVar -> a)     -- ^ For free var
-  -> Bruijn            -- ^ BruijnTerm
-  -> a             -- ^ Result
+  :: (LvlBind -> a)             -- ^ For index
+  -> (Bruijn b -> Bruijn b -> a) -- ^ For application
+  -> (Bruijn b -> a)            -- ^ For function
+  -> (b -> a)                   -- ^ For free var
+  -> Bruijn b                  -- ^ BruijnTerm
+  -> a                         -- ^ Result
 caseBruijn cf ca cl cv =
  \case
   Pat_LvlBind i -> cf i
   Pat_App   f a -> ca f a
   Pat_Lam     b -> cl b
-  Pat_FreeVar b -> cv b
+  Pat_Feature b -> cv b
 
 -- *** Parser
 
@@ -221,7 +226,7 @@ caseBruijn cf ca cl cv =
 
 --  2025-06-16: TODO: there is no `FreeVar` support in parser so far.
 -- | The most strict outer parser, aka expects only sound expression
-parser :: Parser Bruijn
+parser :: forall b . Parser (Bruijn b)
 parser =
   app <|>
   lambda <|>
@@ -231,32 +236,32 @@ parser =
   -- <|>
   -- freeVar
  where
-  app :: Parser Bruijn =
+  app :: Parser (Bruijn b) =
     liftA2
       mkApp
       appFn
       appPar
    where
-    appFn :: Parser Bruijn =
+    appFn :: Parser (Bruijn b) =
       abs (lambda <|> app) <|> bind
-    appPar :: Parser Bruijn =
+    appPar :: Parser (Bruijn b) =
       char ' ' *> (abs app <|> app <|> lambda <|> bind)
     abs p = char '(' *> p <* char ')'
   -- freeVar :: Parser Bruijn =
   --   mkFreeVar <$> takeWhile1 isAlphaNum
-  lambda :: Parser Bruijn =
+  lambda :: Parser (Bruijn b) =
     mkLam <$> ((string "\\ " <|> string "λ ") *> parser)
-  bind :: Parser Bruijn =
+  bind :: Parser (Bruijn b) =
     mkLvlBind <$> decimal
 
 -- | Internalizes Bruijn parser, takes utility parser function of parser, and takes Text into it to parse.
-parseWith :: (Parser Bruijn -> Text -> b) -> Text -> b
+parseWith :: (Parser (Bruijn b) -> Text -> a) -> Text -> a
 parseWith f =
   f parser . (<> "\\n")
 
 -- | Parse the expression recieved.
 -- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
-parseFull :: Text -> Either Text Bruijn
+parseFull :: Text -> Either Text (Bruijn b)
 parseFull =
   mapLeft
     fromString
@@ -264,10 +269,10 @@ parseFull =
 
 -- *** Testing
 
-mk0 :: Bruijn
+mk0 :: Bruijn b
 mk0 = mkLvlBind 0
 
-unitTests :: Seq Bruijn
+unitTests :: Seq (Bruijn b)
 unitTests =
   cons
     mk0

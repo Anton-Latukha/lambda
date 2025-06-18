@@ -111,6 +111,8 @@ library
     , data-fix
     -- | Parser is build on library `attoparsec`
     , attoparsec
+    -- | For example: To separate in expressions binded vs unbound free variables.
+    , validation
 
 executable lambda
 --     , pretty-show
