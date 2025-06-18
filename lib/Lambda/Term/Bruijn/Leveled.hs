@@ -22,7 +22,6 @@ import Data.Attoparsec.Text
     ( decimal, char, parseOnly, string, Parser)
 import Data.Functor.Classes ( Eq1(..) )
 import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..), Algebra)
-import Control.Arrow (ArrowChoice(right))
 
 
 -- ** Lambda calculi
@@ -56,15 +55,19 @@ newtype F_LamLvl = F_LamLvl Natural
 newtype FreeVar = FreeVar Text
  deriving (Eq, Show, Generic)
 
+-- | Value binded to formerly free var.
+newtype VarValue = VarValue Text
+ deriving (Eq, Show, Generic)
+
 -- | What free vars maps to what.
-newtype ContextBinds v = ContextBinds (HashMap FreeVar v)
- deriving (Eq, Show, Generic, Eq1, Functor, Foldable, Traversable)
+newtype ContextBinds = ContextBinds (HashMap FreeVar VarValue)
+ deriving (Eq, Show, Generic)
 
 -- | Environment to drag into Lambda to be what Bruijn level bind to
 newtype LamEnv binding = LamEnv (NonEmpty binding)
  deriving (Eq, Show, Generic, Eq1, Functor, Foldable, Traversable)
 
--- **** Functorial Lambda term/expression
+-- **** Functorial form of Lambda expression
 
 data F a
   = F_LvlBind    !LvlBind
@@ -99,8 +102,6 @@ instance Eq1 F where
 
 newtype Bruijn = Bruijn (Mu F)
  deriving (Eq, Generic)
-
--- **** Finished term
 
 -- ***** Instances for `Bruijn`
 -- Are based on the default instances of the `Mu`
