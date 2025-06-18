@@ -4,7 +4,12 @@
 {-# options_GHC -Wno-unrecognised-pragmas #-}
 {-# hlint ignore "Use camelCase" #-}
 
--- | The context of this module is closed lambda terms only (aka: lawful lambda term that has no free variables)
+-- | This module is about/for:
+--   * Lambda terms;
+--   * in de Bruijn form;
+--   * with lambda binds represented as de Bruijn levels (not de Bruijn indexes, which is classical, because it saves a lot of compute in manipulation. Indexes are reverse numbered from the brunches to the root, which means calculating trees on every manipulation and newertheless to bind variable traking (counting) back up the tree is needed, while levels allow to have an adress map and go to particular level of the branch of the tree;
+--   * allows free variables;
+--   * input expects only lawful lambda binds (allows only non-negative de Bruijn levels) should bind inside the term scope.
 module Lambda.Term.Bruijn.Leveled
 where
 
