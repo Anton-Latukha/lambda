@@ -300,16 +300,37 @@ newtype OutsideValName = OutsideValName Text
 newtype OutsideVal
   = OutsideVal (OutsideVal -> IO OutsideVal)
 
-neb :: ContextBinds -> Bruijn -> IO Bruijn
-neb cnt lt =
-  undefined replaceFreeVars $ project lt
+newtype BindedValue = BindedValue VarValue
+
+newtype NotFoundFreeVar = NotFoundFreeVar FreeVar
+
+newtype NotFoundFreeVarsOnEval = NotFoundFreeVarsOnEval (NonEmpty FreeVar)
+ deriving (Semigroup)
+
+neb :: forall p f . (Coercible p (HashMap FreeVar VarValue), Functor f, Traversable f) => p -> f FreeVar -> Either      (NotFoundFreeVarsOnEval, f (Either NotFoundFreeVar BindedValue))      (f BindedValue)
+neb cnt lt = returnSuccessOrReportState
  where
-  replaceFreeVars :: Bruijn -> IO Bruijn
-  replaceFreeVars brj =
-    caseBruijn
-      (undefined) -- Ideally this should be impossible, all LvlBinds should be applied before this, which means different type
-      (undefined)
-      (undefined)
-      (\ fv -> undefined $ maybe (undefined) (undefined) $ lookupHM (crc @(HashMap FreeVar VarValue) cnt) fv)
-      brj
+  returnSuccessOrReportState :: Either (NotFoundFreeVarsOnEval, f (Either NotFoundFreeVar BindedValue)) (f BindedValue)
+  returnSuccessOrReportState =
+    either
+      (\ uFvs -> Left (uFvs, exprWithEither))
+      pure
+      unboundVarsOrvalidatedExpr
+   where
+
+    exprWith :: Coercible c b => (Either FreeVar VarValue -> c) -> f b
+    exprWith f =  fmap (crc (f . freeOrBinded)) lt
+
+    exprWithEither :: f (Either NotFoundFreeVar BindedValue) = exprWith id
+
+    -- | When `Left` - FreeVar was not found in environment, so can not be bound.
+    freeOrBinded :: FreeVar -> Either FreeVar VarValue
+    freeOrBinded fv = maybe (Left fv) pure $ lookupHM (crc @(HashMap FreeVar VarValue) cnt) fv
+
+    -- | Right - Succesful binding of all free variables, Left - all unbound FreeVars
+    unboundVarsOrvalidatedExpr :: Either NotFoundFreeVarsOnEval (f BindedValue) = Validation.toEither $ sequenceA exprWithValidation
+     where
+      -- | Produce a `NonEmpty` singleton on Failure to `mappend` them later.
+      exprWithValidation :: f (Validation NotFoundFreeVarsOnEval BindedValue) = exprWith Validation.validationNel
+
 
