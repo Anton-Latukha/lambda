@@ -16,18 +16,27 @@ where
 -- ** Import
 
 import Lambda.Prelude
-import Lambda.Atom
+import Data.Char ( isAlphaNum )
 import qualified Text.Show
 import Data.Attoparsec.Text
-    ( decimal, char, parseOnly, parseTest, string, Parser )
+    ( decimal, char, parseOnly, string, Parser)
 import Data.Functor.Classes ( Eq1(..) )
 import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..), Algebra)
+import Control.Arrow (ArrowChoice(right))
+
 
 -- ** Lambda calculi
 
 -- *** Initial type primitive boundaries
 
 -- **** New type typisation for closed Lambda term
+
+-- | Bruijn lambda in lambda term.
+-- | pretty much a bind.
+-- Index < number of external lambda binds => index == binded lambda value
+-- Index >= number of external lambda binds => index == free variable
+newtype LvlBind = LvlBind Natural
+ deriving (Eq, Enum, Num, Show, Generic, Ord, Real, Integral)
 
 newtype F_AppTarget a = F_AppTarget (F a)
  deriving (Eq, Eq1, Show, Generic, Functor, Foldable, Traversable)
@@ -48,7 +57,7 @@ newtype FreeVar = FreeVar Text
  deriving (Eq, Show, Generic)
 
 -- | What free vars maps to what.
-newtype FreeVarContext v = FreeVarContext (HashMap FreeVar v)
+newtype ContextBinds v = ContextBinds (HashMap FreeVar v)
  deriving (Eq, Show, Generic, Eq1, Functor, Foldable, Traversable)
 
 -- | Environment to drag into Lambda to be what Bruijn level bind to
@@ -58,9 +67,9 @@ newtype LamEnv binding = LamEnv (NonEmpty binding)
 -- **** Functorial Lambda term/expression
 
 data F a
-  = F_BjIx    !BjIx
-  | F_App     !(F_AppTarget a) !(F_AppParam a)
+  = F_LvlBind    !LvlBind
   | F_Lam     !(F_LamBody a)
+  | F_App     !(F_AppTarget a) !(F_AppParam a)
   | F_FreeVar !FreeVar
  deriving (Eq, Show, Generic, Functor, Traversable, Foldable)
 
@@ -80,7 +89,7 @@ instance Eq1 F where
     go (F_Lam           b1 ) (F_Lam           b2 ) =      crc go b1 b2
     go (F_App        f1 p1 ) (F_App        f2 p2 ) = (&&) (crc go f1 f2)
                                                          (crc go p1 p2)
-    go (F_BjIx idx1 ) (F_BjIx idx2 ) = (==) idx1
+    go (F_LvlBind idx1 ) (F_LvlBind idx2 ) = (==) idx1
                                            idx2
     go (F_FreeVar bind1 ) (F_FreeVar bind2 ) = (==) bind1
                                              bind2
@@ -143,28 +152,36 @@ turnReadable = show . BruijnBJHumanReadable
 
 -- *** Patterns
 
-pattern Pat_BjIx :: BjIx -> Bruijn
-pattern Pat_BjIx n <- (project -> F_BjIx n) where
-        Pat_BjIx n =    embed ( F_BjIx n)
+-- | Turn level of bind into expression (and back).
+pattern Pat_LvlBind :: LvlBind -> Bruijn
+pattern Pat_LvlBind n <- (project -> F_LvlBind n) where
+        Pat_LvlBind n =    embed ( F_LvlBind n)
 
+-- | Take (or turn back):
+-- 1 -> Target of application;
+-- 2 -> Parameter to apply to;
+-- \therefore: expression of applicaiton.
 pattern Pat_App :: Bruijn -> Bruijn -> Bruijn
 pattern Pat_App f a <- (project -> F_App (F_AppTarget (embed -> f)) (F_AppParam (embed -> a))) where
         Pat_App f a =    embed ( F_App (F_AppTarget (project f)) (F_AppParam (project a)))
 
+-- | Take expression and wrap it into a lambda (and back).
 pattern Pat_Lam :: Bruijn -> Bruijn
 pattern Pat_Lam b <- (project -> F_Lam (F_LamBody (embed -> b))) where
         Pat_Lam b =    embed ( F_Lam (F_LamBody (project b)))
 
+-- | Take FreeVar and produce expression primitive (and back).
 pattern Pat_FreeVar :: FreeVar -> Bruijn
 pattern Pat_FreeVar b <- (project -> F_FreeVar b) where
         Pat_FreeVar b =    embed ( F_FreeVar b)
 
-{-# complete Pat_BjIx, Pat_App, Pat_Lam, Pat_FreeVar #-}
+{-# complete Pat_LvlBind, Pat_App, Pat_Lam, Pat_FreeVar #-}
 
 -- *** Builders
 
-mkBjIx :: Natural -> Bruijn
-mkBjIx = Pat_BjIx . crc
+-- | Encode level to bind to into expression.
+mkLvlBind :: Natural -> Bruijn
+mkLvlBind = Pat_LvlBind . crc
 
 mkApp :: Bruijn -> Bruijn -> Bruijn
 mkApp = Pat_App
@@ -172,11 +189,14 @@ mkApp = Pat_App
 mkLam :: Bruijn -> Bruijn
 mkLam = Pat_Lam
 
+mkFreeVar :: Text -> Bruijn
+mkFreeVar = Pat_FreeVar . crc
+
 -- *** Helpers
 
 -- | Takes a set of for lambda term cases, takes a lambda term, detects term and applies according function to it:
 caseBruijn
-  :: (BjIx -> a)     -- ^ For index
+  :: (LvlBind -> a)     -- ^ For index
   -> (Bruijn -> Bruijn -> a) -- ^ For application
   -> (Bruijn -> a)      -- ^ For function
   -> (FreeVar -> a)     -- ^ For free var
@@ -184,23 +204,32 @@ caseBruijn
   -> a             -- ^ Result
 caseBruijn cf ca cl cv =
  \case
-  Pat_BjIx    i -> cf i
+  Pat_LvlBind i -> cf i
   Pat_App   f a -> ca f a
   Pat_Lam     b -> cl b
   Pat_FreeVar b -> cv b
 
 -- *** Parser
 
+-- | Synthax rules follow general guidelines (from Wikipedia)
+-- Outermost parentheses are dropped: `M N` instead of `(M N)`.
+-- Applications ` ` are assumed to be left-associative: instead of ((M N) P) the M N P may be written.
+-- The body of an abstraction extends as far right as possible: λ M N means λ (M N) and not (λ M) N.
+
+--  2025-06-16: NOTE: Implement lexemes (possibly with lexer `Alex`), with parsing `(...)` from any direction, then for ` ` (application) from right, for lambda from the left.
+
+--  2025-06-16: TODO: there is no `FreeVar` support in parser so far.
+-- | The most strict outer parser, aka expects only sound expression
 parser :: Parser Bruijn
 parser =
-  bjIx <|>
-  fn <|>
-  app
+  app <|>
+  lambda <|>
+  bind
+  -- <|>
+  -- isEndOfLine
+  -- <|>
+  -- freeVar
  where
-  bjIx :: Parser Bruijn =
-    mkBjIx <$> decimal
-  fn :: Parser Bruijn =
-    mkLam <$> (string "\\ " *> bjIx)
   app :: Parser Bruijn =
     liftA2
       mkApp
@@ -208,10 +237,16 @@ parser =
       appPar
    where
     appFn :: Parser Bruijn =
-      between '(' ')' parser
+      abs (lambda <|> app) <|> bind
     appPar :: Parser Bruijn =
-      char ' ' *> parser
-    between bra ket p = char bra *> p <* char ket
+      char ' ' *> (abs app <|> app <|> lambda <|> bind)
+    abs p = char '(' *> p <* char ')'
+  -- freeVar :: Parser Bruijn =
+  --   mkFreeVar <$> takeWhile1 isAlphaNum
+  lambda :: Parser Bruijn =
+    mkLam <$> ((string "\\ " <|> string "λ ") *> parser)
+  bind :: Parser Bruijn =
+    mkLvlBind <$> decimal
 
 -- | Internalizes Bruijn parser, takes utility parser function of parser, and takes Text into it to parse.
 parseWith :: (Parser Bruijn -> Text -> b) -> Text -> b
@@ -220,70 +255,16 @@ parseWith f =
 
 -- | Parse the expression recieved.
 -- Wrapper around @parseOnly@, so expects full expression at once, hence strict.
-parse' :: Text -> Either Text Bruijn
-parse' =
+parseFull :: Text -> Either Text Bruijn
+parseFull =
   mapLeft
     fromString
     . parseWith parseOnly
 
--- *** Normal form
-
--- | Normal form lambda term.
-newtype NBruijn = NBruijn Bruijn
-
-normalize :: Bruijn -> NBruijn
-normalize = crc .
-  caseBruijn
-    Pat_BjIx
-    forApplication
-    forFn
-    Pat_FreeVar
- where
-  forApplication =
-    flip betaReduce
-
-  forFn =
-    Pat_Lam . crc . normalize
-
-  -- | Lambda function application.
-  -- Does beta-reduce when lambda term matches definition, otherwise does id.
-  -- TODO: Try for this function to return Maybe.
-  betaReduce
-    :: Bruijn -- ^ Argument to bind
-    -> Bruijn -- ^ Base expression to bind in
-    -> Bruijn -- ^ Expression with the bind applied
-  betaReduce a =
-    \case
-      (Pat_Lam lb) -> substitute a 0 lb -- Apply value to this level binding
-      other -> Pat_App other a
-   where
-    substitute :: Bruijn -> BjIx -> Bruijn -> Bruijn
-    substitute v bji =
-      caseBruijn
-        searchIndexAndSubstituteOnMatch
-        recurseIntoBothBranches
-        recurseIntoFunction
-        Pat_FreeVar
-     where
-      searchIndexAndSubstituteOnMatch =
-        bool
-          v  -- so substitution under index
-          . Pat_BjIx -- do `id` ("pass")
-          <*> -- patthrough into both branches
-            indexNotFound
-       where
-        indexNotFound = (crc bji /=)
-      recurseIntoBothBranches =
-        on Pat_App (substituteWithPermutatedIndex id)
-      -- | Outside Btuijn indexes increase +1 when enterning a scope of deeper function.
-      --  2025-05-05: NOTE: This is considered costly compared to nameless encoding style. Since it increments/decrements all instances.
-      recurseIntoFunction = substituteWithPermutatedIndex succ
-      substituteWithPermutatedIndex f = substitute v (f bji)
-
 -- *** Testing
 
 mk0 :: Bruijn
-mk0 = mkBjIx 0
+mk0 = mkLvlBind 0
 
 unitTests :: Seq Bruijn
 unitTests =
@@ -295,19 +276,28 @@ unitTests =
       , Pat_Lam
       ]
 
-runUnitTestsWith :: Applicative f => (Bruijn -> f b) -> f ()
-runUnitTestsWith = (`traverse_` unitTests)
+unitTestsText :: [Text]
+unitTestsText =
+  [ "λ 0"
+  , "λ λ 2"
+  , "((λ λ (λ 3) 1) λ 2) 1"
+  , "(λ (λ 0) λ 0) ((λ 2) 1)"
+  , "(λ λ (λ 0) λ 0) λ 0"
+  , "λ (λ 0 (1 1)) λ 0 (1 1)"
+  , "1 2 3 4 5 6 7 8 9 10 11 12"
+  ]
 
-runTurnReadableUnitTests :: IO ()
-runTurnReadableUnitTests =
-  runUnitTestsWith
-    (putTextLn . turnReadable)
+-- *** Normalization by evaluation (NeB)
 
--- | Parses only lawful Bruijin lambda terms.
-runParserUnitTestsFromTurningTermReadable :: IO ()
-runParserUnitTestsFromTurningTermReadable =
-  runUnitTestsWith
-    (parseWith parseTest . turnReadable)
+-- newtype ContextedTerm = ContextedTerm (ContextBinds a)
 
-turnReadableThenParseBack :: Bruijn -> Either Text Bruijn
-turnReadableThenParseBack = parse' . turnReadable
+-- neb :: ContextedTerm -> Bruijn -> _
+-- neb cnt =
+--   traverse (replaceFreeVars) lt
+--  where
+--   findFreeVar f =
+--     caseBruijn
+--       id
+--       id
+--       id
+--       (\ fv -> lookup fv cnt)
