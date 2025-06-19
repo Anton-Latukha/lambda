@@ -307,30 +307,29 @@ newtype NotFoundFreeVar = NotFoundFreeVar FreeVar
 newtype NotFoundFreeVarsOnEval = NotFoundFreeVarsOnEval (NonEmpty FreeVar)
  deriving (Semigroup)
 
-neb :: forall p f . (Coercible p (HashMap FreeVar VarValue), Functor f, Traversable f) => p -> f FreeVar -> Either      (NotFoundFreeVarsOnEval, f (Either NotFoundFreeVar BindedValue))      (f BindedValue)
+neb :: forall p f . (Coercible p (HashMap FreeVar VarValue), Functor f, Traversable f) => p -> f FreeVar -> Either      (f (Either NotFoundFreeVar BindedValue), NotFoundFreeVarsOnEval)      (f BindedValue)
 neb cnt lt = returnSuccessOrReportState
  where
-  returnSuccessOrReportState :: Either (NotFoundFreeVarsOnEval, f (Either NotFoundFreeVar BindedValue)) (f BindedValue)
+  returnSuccessOrReportState :: Either (f (Either NotFoundFreeVar BindedValue), NotFoundFreeVarsOnEval) (f BindedValue)
   returnSuccessOrReportState =
     either
-      (\ uFvs -> Left (uFvs, exprWithEither))
+      (Left . (eitherBindOrNotFound,))
       pure
-      unboundVarsOrvalidatedExpr
+      eitherFullyValidOrBindsNotFound
    where
-
-    exprWith :: Coercible c b => (Either FreeVar VarValue -> c) -> f b
-    exprWith f =  fmap (crc (f . freeOrBinded)) lt
-
-    exprWithEither :: f (Either NotFoundFreeVar BindedValue) = exprWith id
-
-    -- | When `Left` - FreeVar was not found in environment, so can not be bound.
-    freeOrBinded :: FreeVar -> Either FreeVar VarValue
-    freeOrBinded fv = maybe (Left fv) pure $ lookupHM (crc @(HashMap FreeVar VarValue) cnt) fv
+    eitherBindOrNotFound :: f (Either NotFoundFreeVar BindedValue) = bindAllWith id
 
     -- | Right - Succesful binding of all free variables, Left - all unbound FreeVars
-    unboundVarsOrvalidatedExpr :: Either NotFoundFreeVarsOnEval (f BindedValue) = Validation.toEither $ sequenceA exprWithValidation
+    eitherFullyValidOrBindsNotFound :: Either NotFoundFreeVarsOnEval (f BindedValue) = Validation.toEither $ sequenceA validatedBindFreeVars
      where
       -- | Produce a `NonEmpty` singleton on Failure to `mappend` them later.
-      exprWithValidation :: f (Validation NotFoundFreeVarsOnEval BindedValue) = exprWith Validation.validationNel
+      validatedBindFreeVars :: f (Validation NotFoundFreeVarsOnEval BindedValue) = bindAllWith Validation.validationNel
+
+    bindAllWith :: Coercible c b => (Either NotFoundFreeVar VarValue -> c) -> f b
+    bindAllWith f =  fmap (crc (f . bind)) lt
+     where
+      -- | When `Left` - FreeVar was not found in environment, so can not be bound.
+      bind :: FreeVar -> Either NotFoundFreeVar VarValue
+      bind fv = maybe (Left $ crc fv) pure $ lookupHM (crc @(HashMap FreeVar VarValue) cnt) fv
 
 
