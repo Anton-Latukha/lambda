@@ -16,15 +16,13 @@ where
 -- ** Import
 
 import Lambda.Prelude hiding ( fromEither )
-import Data.Char ( isAlphaNum )
 import qualified Text.Show
 import Data.Attoparsec.Text
     ( decimal, char, parseOnly, string, Parser)
 import Data.Functor.Classes ( Eq1(..) )
 import Yaya.Fold ( Steppable(..), Projectable(..), Mu(..), lambek, Recursive(..), Algebra)
-import Data.Validation ( Validation(..), validate, validation, fromEither )
+import Data.Validation (Validation(..))
 import qualified Data.Validation as Validation
-import Data.Foldable1 (Foldable1(toNonEmpty))
 
 
 -- ** Lambda calculi
