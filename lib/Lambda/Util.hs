@@ -56,6 +56,9 @@ module Lambda.Util
   , cons
   , snoc
   , lookupHM
+  , lookupIM
+  , lookupSeq
+
   , crc
 
   , trace
@@ -91,8 +94,10 @@ import           Lens.Family2.Stock             ( _1
                                                 , _2
                                                 )
 import qualified System.FilePath              as FilePath
-import Control.Monad (foldM)
-import qualified Data.HashMap.Lazy             as HM
+import           Control.Monad                  ( foldM )
+import qualified Data.IntMap.Lazy              as IntMapL
+import qualified Data.HashMap.Lazy             as HashMapL
+import qualified Data.Sequence                 as Seq
 
 #if ENABLE_TRACING
 import qualified Relude.Debug                 as X
@@ -418,7 +423,13 @@ snoc :: (Semigroup a, One a) => a -> OneItem a -> a
 snoc xs = (<>) xs . one
 
 lookupHM :: Hashable k => HashMap k v -> k -> Maybe v
-lookupHM = flip HM.lookup
+lookupHM = flip HashMapL.lookup
+
+lookupIM :: IntMap a -> IntMapL.Key -> Maybe a
+lookupIM = flip IntMapL.lookup
+
+lookupSeq :: Seq a -> Int -> Maybe a
+lookupSeq = flip Seq.lookup
 
 while :: (a -> Bool) -> (a -> a) -> a -> a
 while p f = liftA3

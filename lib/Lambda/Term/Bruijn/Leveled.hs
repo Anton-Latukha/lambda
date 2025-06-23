@@ -10,7 +10,7 @@
 --   * with lambda binds represented as de Bruijn levels (not de Bruijn indexes, which is classical, because it saves a lot of compute in manipulation. Indexes are reverse numbered from the brunches to the root, which means calculating trees on every manipulation and newertheless to bind variable traking (counting) back up the tree is needed, while levels allow to have an adress map and go to particular level of the branch of the tree;
 --   * allows free variables;
 --   * input expects only lawful lambda binds (allows only non-negative de Bruijn levels) should bind inside the term scope.
-module Lambda.Term.Bruijn.Leveled
+module Lambda.Term.Bruijn.Leveled ()
 where
 
 -- ** Import
@@ -144,10 +144,6 @@ instance Show b => Show (BruijnBJHumanReadable b) where
       showApp f a = "(" <> l_showHR f <> ") " <> l_showHR a
       showLam :: Bruijn b -> String
       showLam b = "\\ " <> l_showHR b
-
-instance Show b => Show (Bruijn b) where
-  show :: Bruijn b -> String
-  show (crc @(BruijnBJHumanReadable b) -> a) = show a
 
 -- **** Functions
 
@@ -305,29 +301,57 @@ newtype NotFoundFreeVar = NotFoundFreeVar FreeVar
 newtype NotFoundFreeVarsOnEval = NotFoundFreeVarsOnEval (NonEmpty FreeVar)
  deriving (Semigroup)
 
-neb :: forall p f . (Coercible p (HashMap FreeVar VarValue), Functor f, Traversable f) => p -> f FreeVar -> Either      (f (Either NotFoundFreeVar BindedValue), NotFoundFreeVarsOnEval)      (f BindedValue)
-neb cnt lt = returnSuccessOrReportState
+neb :: forall f . (Functor f, Traversable f) => ContextBinds  -> f FreeVar -> Either      (f (Either NotFoundFreeVar BindedValue), NotFoundFreeVarsOnEval)      (f BindedValue)
+neb ctx lt = returnSuccessOrReportState
  where
   returnSuccessOrReportState :: Either (f (Either NotFoundFreeVar BindedValue), NotFoundFreeVarsOnEval) (f BindedValue)
   returnSuccessOrReportState =
     either
-      (Left . (eitherBindOrNotFound,))
+      (Left . (eitherBindOrNotFound ctx lt,))
       pure
       eitherFullyValidOrBindsNotFound
    where
-    eitherBindOrNotFound :: f (Either NotFoundFreeVar BindedValue) = bindAllWith id
-
     -- | Right - Succesful binding of all free variables, Left - all unbound FreeVars
     eitherFullyValidOrBindsNotFound :: Either NotFoundFreeVarsOnEval (f BindedValue) = Validation.toEither $ sequenceA validatedBindFreeVars
      where
       -- | Produce a `NonEmpty` singleton on Failure to `mappend` them later.
-      validatedBindFreeVars :: f (Validation NotFoundFreeVarsOnEval BindedValue) = bindAllWith Validation.validationNel
-
-    bindAllWith :: Coercible c b => (Either NotFoundFreeVar VarValue -> c) -> f b
-    bindAllWith f =  fmap (crc (f . bind)) lt
-     where
-      -- | When `Left` - FreeVar was not found in environment, so can not be bound.
-      bind :: FreeVar -> Either NotFoundFreeVar VarValue
-      bind fv = maybe (Left $ crc fv) pure $ lookupHM (crc @(HashMap FreeVar VarValue) cnt) fv
+      validatedBindFreeVars :: f (Validation NotFoundFreeVarsOnEval BindedValue) = bindAllWith Validation.validationNel ctx lt
 
 
+eitherBindOrNotFound :: Functor f => ContextBinds -> f FreeVar ->  f (Either NotFoundFreeVar BindedValue)
+eitherBindOrNotFound = bindAllWith id
+
+bindAllWith :: (Coercible c b, Functor f) => (Either NotFoundFreeVar VarValue -> c) -> ContextBinds -> f FreeVar -> f b
+bindAllWith f ctx =  (crc (f . metaBind lookupHM id ctx) <$>)
+
+metaBind f transform ctx a =
+  maybe
+    (Left $ crc a)
+    pure
+    $ f (crc ctx) $ transform a
+
+newtype LvlBinds a = LvlBinds (IntMap (Bruijn a))
+
+newtype NotFoundLvl = NotFoundLvl LvlBind
+
+eval :: ContextBinds -> LvlBinds FreeVar -> Bruijn FreeVar -> Either (Either NotFoundLvl (Bruijn FreeVar)) (Either NotFoundFreeVar BindedValue)
+eval ctx upLvls lt =
+  caseBruijn
+    (Left . bind)
+    (undefined)
+    (undefined)
+    (pure . metaBind lookupHM id ctx)
+    $ lt
+ where
+
+  bind :: LvlBind -> Either NotFoundLvl (Bruijn FreeVar)
+  bind =
+    metaBind lookupIM fromEnum upLvls
+
+  -- bindLvl :: LvlBind -> _
+  -- bindLvl lvl = Seq.lookup (fromEnum lvl) allLvls
+  allLvls :: Recursive (->) (F FreeVar (Bruijn FreeVar)) f0 => Seq (Bruijn FreeVar)
+  allLvls = cata (getLvl :: Algebra (->) f0 (Seq (Bruijn FreeVar))) $ project lt
+   where
+    getLvl :: w2
+    getLvl = undefined
