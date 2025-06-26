@@ -324,6 +324,7 @@ eitherBindOrNotFound = bindAllWith id
 bindAllWith :: (Coercible c b, Functor f) => (Either NotFoundFreeVar VarValue -> c) -> ContextBinds -> f FreeVar -> f b
 bindAllWith f ctx =  (crc (f . metaBind lookupHM id ctx) <$>)
 
+metaBind :: (Coercible t1 a1, Coercible a2 t2) => (t2 -> a3 -> Maybe b) -> (t1 -> a3) -> a2 -> t1 -> Either a1 b
 metaBind f transform ctx a =
   maybe
     (Left $ crc a)
@@ -337,7 +338,7 @@ newtype NotFoundLvl = NotFoundLvl LvlBind
 eval :: ContextBinds -> LvlBinds FreeVar -> Bruijn FreeVar -> Either (Either NotFoundLvl (Bruijn FreeVar)) (Either NotFoundFreeVar BindedValue)
 eval ctx upLvls lt =
   caseBruijn
-    (Left . bind)
+    (\ l -> undefined $ fmap (eval ctx upLvls) $ bind $ l)  -- bind Lambda term into place and at-once recurce into its evaluation.
     (undefined)
     (undefined)
     (pure . metaBind lookupHM id ctx)
